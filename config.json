@@ -5,36 +5,64 @@
                 "name": "user1",
                 "enabled": false,
                 "domain": "pro.yuketang.cn",
-                "classroomCodeList": ["YVQ6QC", "7DEN3A"],
-                "classroomWhiteList": [],
-                "classroomBlackList": ["未央.机器学习", "未央.深度学习"],
-                "classroomStartTimeDict": {
-                    "未央.机器学习": {"1": "08:00", "2": "13:30"},
-                    "未央.深度学习": {"1": "13:30"}
+                "lesson": {
+                    "classroomCodeList": ["YVQ6QC", "7DEN3A"],
+                    "classroomWhiteList": [],
+                    "classroomBlackList": ["未央.机器学习", "未央.深度学习"],
+                    "classroomStartTimeDict": {
+                        "未央.机器学习": {"1": "08:00", "2": "13:30"},
+                        "未央.深度学习": {"1": "13:30"}
+                    },
+                    "llm": false,
+                    "an": false,
+                    "ppt": false,
+                    "si": false
                 },
-                "llm": false,
-                "an": false,
-                "ppt": false,
-                "si": false,
+                "exam": {
+                    "classroomWhiteList": ["未央.机器学习"],
+                    "llm": false,
+                    "an": false,
+                    "paper": false,
+                    "isMaster": false,
+                    "isSlave": false,
+                    "x_access_token": ""
+                },
+                "other": {
+                    "classroomCodeList": ["94RGB"]
+                },
                 "services": ["dingtalk", "feishu"]
             },
             {
                 "name": "user2",
                 "enabled": false,
                 "domain": "pro.yuketang.cn",
-                "classroomCodeList": ["YVQ6QC", "7DEN3A"],
-                "classroomWhiteList": [],
-                "classroomBlackList": ["未央.机器学习", "未央.深度学习"],
-                "classroomStartTimeDict": {
-                    "未央.机器学习": {"1": "08:00", "2": "13:30"},
-                    "未央.深度学习": {"1": "13:30"}
+                "lesson": {
+                    "classroomCodeList": ["YVQ6QC", "7DEN3A"],
+                    "classroomWhiteList": [],
+                    "classroomBlackList": ["未央.机器学习", "未央.深度学习"],
+                    "classroomStartTimeDict": {
+                        "未央.机器学习": {"1": "08:00", "2": "13:30"},
+                        "未央.深度学习": {"1": "13:30"}
+                    },
+                    "llm": false,
+                    "an": false,
+                    "ppt": false,
+                    "si": false
                 },
-                "llm": false,
-                "an": false,
-                "ppt": false,
-                "si": false,
+                "exam": {
+                    "classroomWhiteList": ["未央.机器学习"],
+                    "llm": false,
+                    "an": false,
+                    "paper": false,
+                    "isMaster": false,
+                    "isSlave": false,
+                    "x_access_token": ""
+                },
+                "other": {
+                    "classroomCodeList": ["94RGB"]
+                },
                 "services": ["dingtalk", "feishu"]
-            }
+            },
         ],
         "timeout": 30
     },
