@@ -7,11 +7,14 @@ import time
 import freetype
 import math
 import qrcode
+from html import unescape
 from pyzbar.pyzbar import decode
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime, timedelta
+from email.utils import parsedate_to_datetime
 from pytz import timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import Counter
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(current_dir)
@@ -22,6 +25,21 @@ with open('config.json', 'r', encoding='utf-8') as f:
 timeout = config['util']['timeout']
 threads = config['util']['threads']
 tz = timezone(config['util']['timezone'])
+
+def freeze(o):
+    if isinstance(o, dict):
+        # 键值递归冻结，转为无序的 frozenset
+        return frozenset((k, freeze(v)) for k, v in o.items())
+    elif isinstance(o, list) or isinstance(o, tuple):
+        c = Counter(freeze(x) for x in o)
+        return frozenset(c.items())
+    elif isinstance(o, set):
+        return frozenset(freeze(x) for x in o)
+    else:
+        return o  # 假定类型可哈希
+
+def equal_unordered(a, b):
+    return freeze(a) == freeze(b)
 
 def download_qrcode(url, name):
     try:
@@ -88,6 +106,12 @@ def cookie_date(response):
     nearest_expires = min(expires_datetimes, default=None)
     return nearest_expires
 
+def rfc1123_gmt_to_ts(date_str):
+    dt = parsedate_to_datetime(date_str)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return int(dt.timestamp())
+
 def clear_folder(folder_path):
     try:
         if os.path.isfile(folder_path) or os.path.islink(folder_path):
@@ -95,7 +119,7 @@ def clear_folder(folder_path):
         elif os.path.isdir(folder_path):
             shutil.rmtree(folder_path)
     except Exception as e:
-        print(f'删除 {folder_path} 时发生错误。原因: {e}')
+        print(f"删除 {folder_path} 时发生错误。原因: {e}")
     os.makedirs(folder_path)
 
 def download_image(item, folder, retry_delay=5, backoff=1.5, max_delay=60):
@@ -134,7 +158,7 @@ def download_images_to_folder(slides, folder):
 
 def images_to_pdf(folder, output_path):
     if not os.path.exists(folder):
-        print(f'文件夹 {folder} 不存在')
+        print(f"文件夹 {folder} 不存在")
         return
     
     image_files = [f for f in os.listdir(folder)
@@ -145,7 +169,7 @@ def images_to_pdf(folder, output_path):
     images = [Image.open(f).convert('RGB') for f in image_files]
     if images:
         images[0].save(output_path, save_all=True, append_images=images[1:])
-        print(f'PDF文件已生成: {output_path}')
+        print(f"PDF文件已生成: {output_path}")
     else:
         print("没有找到任何图片文件")
 
@@ -185,7 +209,7 @@ def format_json_to_text(json_data, list_data):
             index_data.append(problem_info['index'])
         text_result += "-"*20 + "\n"
         body = problem_info.get('body', '未知问题')
-        problemType = {1: "单选题", 2: "多选题", 3: "投票题", 4: "填空题", 5: "主观题"}.get(problem_info['problemType'], "其它题型")
+        problemType = {1: "单选题", 2: "多选题", 3: "投票题", 4: "填空题", 5: "主观题", 6: "判断题"}.get(problem_info['problemType'], "其它题型")
         text_result += f"PPT: 第{problem_info['index']}页 {problemType} {fmt_num(problem_info.get('score', 0))}分\n问题: {body}\n"
         if 'options' in problem_info:
             for option in problem_info['options']:
@@ -198,6 +222,20 @@ def format_json_to_text(json_data, list_data):
             text_result += f"\n- PPT第{item}页"
     return text_result
 
+def convert_body_to_text(body, img=False):
+    text = re.sub(r'^<div class="custom_ueditor_cn_body">|</div>$', r'', body)
+    text = re.sub(r'<audio.*?</audio>', r'\r', text)
+    text = re.sub(r'<img class="kfformula".*?data-latex="(.*?)".*?/>', r'$\1$', text)
+    if not img: text = re.sub(r'<img .*?/>', r'', text)
+    text = re.sub(r'<pre[^>]*>(.*?)</pre>', r'\1', text)
+    text = re.sub(r'<span[^>]*>|</span>|<strong>|</strong>|<em>|</em>|&#8203;', r'', text)
+    text = re.sub(r'<p[^>]*>|</p>|<br/>', r'\r', text)
+    text = re.sub(r'[\n\r]+', r'\r', text)
+    text = text.strip()
+    text = unescape(text).replace('\xa0', ' ')
+    if img and text.startswith('<img'): text = '\r' + text
+    return text
+
 async def recv_json(websocket):
     server_response = await websocket.recv()
     # print(f"Received from server: {server_response}")
@@ -208,7 +246,7 @@ def draw_cn_text_no_pillow(im, text, vpos, k):
     if not isinstance(im, Image.Image):
         raise TypeError("draw_cn_text_no_pillow 现在要求传入 PIL.Image 对象")
 
-    face = freetype.Face(os.path.join(current_dir, "msyh.ttc"))
+    face = freetype.Face("msyh.ttc")
     w = im.width
     scale_ref = max(0.6, w / 1200.0)
     font_size = int(64 * scale_ref / k)
@@ -280,7 +318,7 @@ def draw_cn_text_no_pillow(im, text, vpos, k):
         im.paste(black, box, mask_crop)
     return im
 
-def concat_vertical_cv(folder, image_type, quality, questionList=[]):
+def concat_vertical_cv(folder, image_type, quality, questionList, mark):
     # 收集并排序文件(raw_数字.jpg)
     files = [f for f in os.listdir(folder)
              if f.lower().endswith('.jpg') and f.lower().startswith('raw_') and os.path.splitext(f)[0][4:].isdigit()]
@@ -288,7 +326,7 @@ def concat_vertical_cv(folder, image_type, quality, questionList=[]):
     files = [os.path.join(folder, f) for f in files]
 
     if not files:
-        print(f'文件夹 {folder} 中没有任何图片文件')
+        print(f"文件夹 {folder} 中没有任何图片文件")
         return
 
     if image_type == 3:
@@ -318,7 +356,7 @@ def concat_vertical_cv(folder, image_type, quality, questionList=[]):
                     new_h = max(1, int(im.height / k))
                     im = im.resize((new_w, new_h), RESAMPLE)
 
-                    if image_type == 1:
+                    if image_type == 1 and mark:
                         txt = f"第{stem}页"
                         im = draw_cn_text_no_pillow(im, txt, 'top', k)
                         im = draw_cn_text_no_pillow(im, txt, 'middle', k)
@@ -395,10 +433,11 @@ def concat_vertical_cv(folder, image_type, quality, questionList=[]):
             try:
                 with Image.open(p) as im_src:
                     im = im_src.convert("RGB").resize((new_w, new_h), RESAMPLE)
-                txt = f"第{stem}页"
-                im = draw_cn_text_no_pillow(im, txt, 'top', k)
-                im = draw_cn_text_no_pillow(im, txt, 'middle', k)
-                im = draw_cn_text_no_pillow(im, txt, 'bottom', k)
+                if mark:
+                    txt = f"第{stem}页"
+                    im = draw_cn_text_no_pillow(im, txt, 'top', k)
+                    im = draw_cn_text_no_pillow(im, txt, 'middle', k)
+                    im = draw_cn_text_no_pillow(im, txt, 'bottom', k)
 
                 row_canvas = Image.new("RGB", (canvas_w, im.height), (255, 255, 255))
                 row_canvas.paste(im, ((canvas_w - im.width) // 2, 0))
@@ -477,10 +516,11 @@ def concat_vertical_cv(folder, image_type, quality, questionList=[]):
             try:
                 with Image.open(p) as im_src:
                     im = im_src.convert("RGB").resize((new_w, new_h), RESAMPLE)
-                txt = f"第{stem}页"
-                im = draw_cn_text_no_pillow(im, txt, 'top', k)
-                im = draw_cn_text_no_pillow(im, txt, 'middle', k)
-                im = draw_cn_text_no_pillow(im, txt, 'bottom', k)
+                if mark:
+                    txt = f"第{stem}页"
+                    im = draw_cn_text_no_pillow(im, txt, 'top', k)
+                    im = draw_cn_text_no_pillow(im, txt, 'middle', k)
+                    im = draw_cn_text_no_pillow(im, txt, 'bottom', k)
 
                 row = i // cols
                 row_count = last_row_count if (row == full_rows and last_row_count) else cols
@@ -542,10 +582,11 @@ def concat_vertical_cv(folder, image_type, quality, questionList=[]):
             try:
                 with Image.open(p) as im_src:
                     im = im_src.convert("RGB").resize((new_w, new_h), RESAMPLE)
-                txt = f"第{stem}页"
-                im = draw_cn_text_no_pillow(im, txt, 'top', k)
-                im = draw_cn_text_no_pillow(im, txt, 'middle', k)
-                im = draw_cn_text_no_pillow(im, txt, 'bottom', k)
+                if mark:
+                    txt = f"第{stem}页"
+                    im = draw_cn_text_no_pillow(im, txt, 'top', k)
+                    im = draw_cn_text_no_pillow(im, txt, 'middle', k)
+                    im = draw_cn_text_no_pillow(im, txt, 'bottom', k)
 
                 row = i // cols
                 row_count = last_row_count if (row == full_rows and last_row_count) else cols

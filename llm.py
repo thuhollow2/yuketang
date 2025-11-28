@@ -52,7 +52,7 @@ class LLMManager:
         query = convert_problems_to_query(problems)
         if not query: return reply
         with ThreadPoolExecutor(max_workers=threads) as pool:
-            tasks = [pool.submit(self._generate_answer, m['type'], folder, query, m) for m in models if m['enabled']]
+            tasks = [pool.submit(self._generate_answer, m['type'], folder, query, m) for m in models if m.get('enabled', False)]
             for future in as_completed(tasks):
                 try:
                     future.result()
@@ -94,6 +94,8 @@ class LLMManager:
                 for i in range(min([len(ans) for ans in page_answers])):
                     new_list.append(best_item([[ans[i]] for ans in page_answers], scoreList)[0])
                 best_answer[page] = new_list
+            elif tp == 6:
+                best_answer[page] = best_item(page_answers, scoreList)
             else:
                 new_list = []
                 for i in range(min([len(ans) for ans in page_answers])):
@@ -193,6 +195,19 @@ def convert_problems_to_query(problems):
                 query_part += "题目参考该页内容,"
             query_part += "你应该结合题目给出一个答案,尽量简明扼要"
             format_part += "[\"主观题答案\"]"
+        if tp == 6:
+            query_part += "判断题,"
+            if details.get('body').strip():
+                query_part += f"题目是\"{details['body'].strip()}\","
+            else:
+                query_part += "题目参考该页内容,"
+            for index, val in enumerate(details['option_values']):
+                if val.strip():
+                    query_part += f"选项{details['option_keys'][index]}是\"{val.strip()}\","
+                else:
+                    query_part += f"选项{details['option_keys'][index]}参考该页内容,"
+            query_part += "你应该从\"" + ",".join(details['option_keys']) + "\"中选出最符合的一个选项"
+            format_part += f"[\"{details['option_keys'][0]}\"]"
         else:
             query_part += "其它题型,"
             if details.get('body').strip():
@@ -206,7 +221,7 @@ def convert_problems_to_query(problems):
     if not query_parts or not format_parts:
         return ""
     query = "这些是课程文件,请你先仔细阅读完所有内容,理解所有知识后,再严谨准确地解答并只解答以下页码的题目:" + ",".join([str(p) for p in pages]) + "." + ";".join(query_parts) + "."
-    query += "解答完毕后可以得到一个字典,键是页码,值是选项列表(适用于单选题,多选题和投票题,单选题应给出只含一个选项的列表,如[\"A\"];多选题应给出含一个或多个选项的列表,如[\"A\", \"B\"];投票题应给出含合适个选项的列表,如[\"A\"])或答案列表(适用于填空题,主观题和其它题型,填空题应给出数量与填空处相等的答案的列表,主观题应给出只含一个答案的列表,其他题型给出含合适答案的列表),字典必须写成一行字符串.最终答案必须在该字符串前面和后面都加上5个\"~\"."
+    query += "解答完毕后可以得到一个字典,键是页码,值是选项列表(适用于单选题,判断题,多选题和投票题,单选题应给出只含一个选项的列表,如[\"A\"];判断题应给出只含一个选项的列表,如[\"true\"];多选题应给出含一个或多个选项的列表,如[\"A\", \"B\"];投票题应给出含合适个选项的列表,如[\"A\"])或答案列表(适用于填空题,主观题和其它题型,填空题应给出数量与填空处相等的答案的列表,主观题应给出只含一个答案的列表,其他题型给出含合适答案的列表),字典必须写成一行字符串.最终答案必须在该字符串前面和后面都加上5个\"~\"."
     query += "最终答案格式可参照如下: ~~~~~{" + ", ".join(format_parts) + "}~~~~~ .按上述要求,请你给出并只给出最终答案."
     return query
 
@@ -257,6 +272,13 @@ def convert_answer_to_dict(answer, problems):
                         print(f"答案格式错误, 第{page}页应为主观题, 答案应为只含一个答案的列表")
                         continue
                     all_answers[page].append([ans.strip() for ans in answer_dict[page]])
+                elif tp == 6:
+                    if not isinstance(answer_dict[page], list):
+                        print(f"答案格式错误, 第{page}页应为判断题, 答案应为只含一个选项的列表")
+                        continue
+                    options = [opt for opt in problems[page]['option_keys'] if opt in answer_dict[page]]
+                    if options:
+                        all_answers[page].append([options[0]])
                 else:
                     if not isinstance(answer_dict[page], list) or len(answer_dict[page]) < 1:
                         print(f"答案格式错误, 第{page}页应为其它题型, 答案应为含合适答案的列表")
@@ -1329,7 +1351,7 @@ def generate_cohere_answer(query, folder, config):
     return text
 
 if __name__ == "__main__":
-    folder = "1529274209982060032"
+    folder = os.path.join("pro.yuketang.cn", "lesson", "1529274209982060032")
     if os.path.exists(os.path.join(folder, "problems.txt")):
         with open(os.path.join(folder, "problems.txt"), "r", encoding="utf-8") as f:
             problems = ast.literal_eval(f.read().strip())
@@ -1339,7 +1361,7 @@ if __name__ == "__main__":
     reply_text = "LLM答案列表:"
     for key in problems.keys():
         reply_text += "\n" + "-"*20
-        problemType = {1: "单选题", 2: "多选题", 3: "投票题", 4: "填空题", 5: "主观题"}.get(problems[key]['problemType'], "其它题型")
+        problemType = {1: "单选题", 2: "多选题", 3: "投票题", 4: "填空题", 5: "主观题", 6: "判断题"}.get(problems[key]['problemType'], "其它题型")
         reply_text += f"\nPPT: 第{key}页 {problemType} {format(float(problems[key].get('score', 0))/100.0, '.15f').rstrip('0').rstrip('.') or '0'}分"
         if reply['best_answer'].get(key):
             reply_text += f"\n最佳答案: {reply['best_answer'][key]}\n所有答案:"

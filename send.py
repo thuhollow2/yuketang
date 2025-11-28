@@ -18,7 +18,7 @@ threads = config['send']['threads']
 class SendManager:
     def __init__(self, prefix, services):
         self.prefix = prefix
-        self.services = [s for s in config['send']['services'] if s['enabled'] and s['name'] in services]
+        self.services = [s for s in config['send']['services'] if s.get('enabled', False) and s['name'] in services]
 
     def _send_wx_msg(self, msg, service):
         access_token = get_wx_token(service)
@@ -277,7 +277,7 @@ def upload_wx_file(filepath, access_token, max_data=20971520):
         try:
             r=requests.post(f'https://qyapi.weixin.qq.com/cgi-bin/media/upload?access_token={access_token}&type=file', files=files, timeout=timeout)
             if r.json()['errcode'] == 60020:
-                print('企业微信文件上传失败: 未配置可信IP')
+                print("企业微信文件上传失败: 未配置可信IP")
                 return []
         except Exception as e:
             print(f"企业微信文件上传发生错误: {e}")
@@ -298,7 +298,7 @@ def send_wx_msg(parts, service, access_token):
             r = requests.post(
                 f'https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token={access_token}', data=data, timeout=timeout)
             if r.json()['errcode'] == 60020:
-                print('企业微信消息发送失败: 未配置可信IP')
+                print("企业微信消息发送失败: 未配置可信IP")
                 return
         except Exception as e:
             print(f"企业微信消息发送发生错误: {e}")
@@ -318,7 +318,7 @@ def send_wx_image(media_ids, service, access_token):
             r = requests.post(
                 f'https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token={access_token}', data=data, timeout=timeout)
             if r.json()['errcode'] == 60020:
-                print('企业微信图片发送失败: 未配置可信IP')
+                print("企业微信图片发送失败: 未配置可信IP")
                 return
         except Exception as e:
             print(f"企业微信图片发送发生错误: {e}")
@@ -338,7 +338,7 @@ def send_wx_file(media_ids, service, access_token):
             r = requests.post(
                 f'https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token={access_token}', data=data, timeout=timeout)
             if r.json()['errcode'] == 60020:
-                print('企业微信文件发送失败: 未配置可信IP')
+                print("企业微信文件发送失败: 未配置可信IP")
                 return
         except Exception as e:
             print(f"企业微信文件发送发生错误: {e}")

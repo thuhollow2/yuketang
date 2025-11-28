@@ -98,36 +98,64 @@ python main.py
                 "name": "user1",
                 "enabled": false,
                 "domain": "pro.yuketang.cn",
-                "classroomCodeList": ["YVQ6QC", "7DEN3A"],
-                "classroomWhiteList": [],
-                "classroomBlackList": ["未央.机器学习", "未央.深度学习"],
-                "classroomStartTimeDict": {
-                    "未央.机器学习": {"1": "08:00", "2": "13:30"},
-                    "未央.深度学习": {"1": "13:30"}
+                "lesson": {
+                    "classroomCodeList": ["YVQ6QC", "7DEN3A"],
+                    "classroomWhiteList": [],
+                    "classroomBlackList": ["未央.机器学习", "未央.深度学习"],
+                    "classroomStartTimeDict": {
+                        "未央.机器学习": {"1": "08:00", "2": "13:30"},
+                        "未央.深度学习": {"1": "13:30"}
+                    },
+                    "llm": false,
+                    "an": false,
+                    "ppt": false,
+                    "si": false
                 },
-                "llm": false,
-                "an": false,
-                "ppt": false,
-                "si": false,
+                "exam": {
+                    "classroomWhiteList": ["未央.机器学习"],
+                    "llm": false,
+                    "an": false,
+                    "paper": false,
+                    "isMaster": false,
+                    "isSlave": false,
+                    "x_access_token": ""
+                },
+                "other": {
+                    "classroomCodeList": ["94RGB"]
+                },
                 "services": ["dingtalk", "feishu"]
             },
             {
                 "name": "user2",
                 "enabled": false,
                 "domain": "pro.yuketang.cn",
-                "classroomCodeList": ["YVQ6QC", "7DEN3A"],
-                "classroomWhiteList": [],
-                "classroomBlackList": ["未央.机器学习", "未央.深度学习"],
-                "classroomStartTimeDict": {
-                    "未央.机器学习": {"1": "08:00", "2": "13:30"},
-                    "未央.深度学习": {"1": "13:30"}
+                "lesson": {
+                    "classroomCodeList": ["YVQ6QC", "7DEN3A"],
+                    "classroomWhiteList": [],
+                    "classroomBlackList": ["未央.机器学习", "未央.深度学习"],
+                    "classroomStartTimeDict": {
+                        "未央.机器学习": {"1": "08:00", "2": "13:30"},
+                        "未央.深度学习": {"1": "13:30"}
+                    },
+                    "llm": false,
+                    "an": false,
+                    "ppt": false,
+                    "si": false
                 },
-                "llm": false,
-                "an": false,
-                "ppt": false,
-                "si": false,
+                "exam": {
+                    "classroomWhiteList": ["未央.机器学习"],
+                    "llm": false,
+                    "an": false,
+                    "paper": false,
+                    "isMaster": false,
+                    "isSlave": false,
+                    "x_access_token": ""
+                },
+                "other": {
+                    "classroomCodeList": ["94RGB"]
+                },
                 "services": ["dingtalk", "feishu"]
-            }
+            },
         ],
         "timeout": 30
     },
@@ -443,19 +471,39 @@ python main.py
 
  - 支持多用户配置，每个用户独立运行，互不影响
 
- - 支持多线程监听，每 30 秒扫描新课堂、尝试使用班级邀请码/课堂暗号加入新班级，随后自动签到、下载课件（PDF）、打印题目、生成并打印答案、获取 PPT 进度、自动答题等
-
- - 签到方式为通过“正在上课”提示进入课堂
-
- - 答案已无法从雨课堂前端获取，现改用**大语言模型**生成
-
- - 自动答题支持单选题、多选题、投票题、填空题和主观题；若未获取到答案，将提交默认答案（可修改[此处](yuketang.py#L429-L440)）
+ - 支持多协程监听：每 30 秒扫描新课堂、尝试使用班级邀请码/课堂暗号加入新班级，随后自动签到、下载课件（PDF）、打印题目、生成并打印答案、获取 PPT 进度、自动答题等；每 30 秒扫描新考试，待用户开始开始后，下载试卷、打印题目、生成并打印答案、自动答题等
 
  - 课程名可在雨课堂首页的课程标签里查找，具体如图中红框所示
 
  ![](classroomName-1.png)
  
  ![](classroomName-2.png)
+
+ - 课堂签到方式为通过“正在上课”提示进入课堂
+
+ - 答案已无法从雨课堂前端获取，支持使用**大语言模型**生成
+
+ - 自动答题支持单选题、多选题、投票题、填空题、主观题和判断题；若未获取到答案，将提交默认答案（可修改[此处](yuketang.py#L429-L440)）
+
+ - 考试自动答题，指程序检测到用户已开始考试时，将生成或同步答案并上传至考试系统缓存；其并非正式提交，需用户手动提交试卷或考试截止自动提交试卷
+
+ - 考试自动答题支持用户间同步，使能 `isMaster` 的用户答题时，所有使能 `isSlave` 的用户将同步提交相同答案，同步间隔时间约 30 秒
+
+ - 考试系统缓存答案时，会记录 IP 地址和缓存时间，请尽量使用同一 IP 地址参加考试，手动切换各题答案以保证缓存时间合理
+
+ - 考试系统并非雨课堂，因此从雨课堂首次进入考试系统，将通过以下按钮之一跳转到考试系统
+
+ ![](exam-1.png)
+ 
+ ![](exam-2.png)
+
+ 在跳转过程中，考试系统将利用雨课堂 cookie 生成考试系统 `x_access_token`，其有效期约一天，且同一用户同一时间唯一，若用户先在网页端进入考试页面并开始考试，后使用程序进入考试系统，将导致 `x_access_token` 更新，使得网页端考试页面失效
+
+ ![](exam-3.png)
+
+ 若考试启用了在线监考，考试开始后可能会随机截屏。为避免以上问题，建议用户在初次进入考试页面，且未开始考试时，调取浏览器开发者工具，进入**网络**选项卡，刷新考试页面，找到任意请求，查看请求头中的 `x_access_token` 字段，并复制该值，填入到 `config.json` 中 `exam` 配置下的对应用户的 `x_access_token` 字段，再启动程序、网页端开始考试；此时程序将直接使用该值进入考试系统，不会生成新的 `x_access_token` 导致网页端考试页面失效
+
+ ![](exam-4.png)
 
 ## 配置文件
 
@@ -484,37 +532,77 @@ python main.py
 | 长江雨课堂 | [changjiang.yuketang.cn](https://changjiang.yuketang.cn) |
 | 黄河雨课堂 | [huanghe.yuketang.cn](https://huanghe.yuketang.cn) |
 
- - <code>classroomCodeList</code>
+ - <code>lesson</code>
+ 
+课程签到、答题等配置
 
-班级邀请码/课堂暗号列表。每 30 秒尝试加入相应班级，班级满员时可启用此功能待成员退出抢占名额
+   - <code>classroomWhiteList</code>
 
- - <code>classroomWhiteList</code>
+   课程白名单。记录课程名，课程名采用完全匹配，优先级低于黑名单，为空时不启用
 
-课程白名单。记录课程名，优先级低于黑名单，课程名采用完全匹配，为空时不启用
+   - <code>classroomBlackList</code>
 
- - <code>classroomBlackList</code>
+   课程黑名单。记录课程名，课程名采用完全匹配，优先级高于白名单，为空时不启用
 
-课程黑名单。记录课程名，优先级高于白名单，课程名采用完全匹配，为空时不启用
+   - <code>classroomStartTimeDict</code>
 
- - <code>classroomStartTimeDict</code>
+   课程星期内各日最早进入时间。课程名采用完全匹配；使用指定时区，周一-周日对应 `1 - 7`，时间格式为 `HH:MM`；当日时间值不为空且此时早于该值不签到，数字或时间为空不启用
 
-课程星期内各日最早进入时间。课程名采用完全匹配；使用指定时区，周一-周日对应 `1 - 7`，时间格式为 `HH:MM`；当日时间值不为空且此时早于该值不签到，数字或时间为空不启用
+   - <code>llm</code>
 
- - <code>llm</code>
+   是否使用大语言模型生成答案
 
-是否使用大语言模型生成答案
+   - <code>an</code>
 
- - <code>an</code>
+   是否自动答题
 
-是否自动答题
+   - <code>ppt</code>
 
- - <code>ppt</code>
+   是否发送 PPT 文件
 
-是否发送 PPT 文件
+   - <code>si</code>
 
- - <code>si</code>
+   是否实时推送 PPT 进度
 
-是否实时推送 PPT 进度
+ - <code>exam</code>
+ 
+考试答题配置
+
+   - <code>classroomWhiteList</code>
+
+   课程白名单。记录课程名，优先级低于黑名单，课程名采用完全匹配，为空时表示不启用考试答题功能
+
+   - <code>llm</code>
+
+   是否使用大语言模型生成答案
+
+   - <code>an</code>
+
+   是否自动答题
+
+   - <code>paper</code>
+
+   是否发送试卷文件
+
+   - <code>isMaster</code>
+
+   是否为主控用户，主控用户答题时，所有使能从控用户将同步提交相同答案
+
+   - <code>isSlave</code>
+
+   是否为从控用户，从控用户将同步主控用户的答案
+
+   - <code>x_access_token</code>
+
+   考试系统访问令牌，若填写则直接使用该值进入考试系统，不会生成新的令牌；若不填写，程序将自行生成
+
+ - <code>other</code>
+ 
+其他配置
+
+   - <code>classroomCodeList</code>
+
+   班级邀请码/课堂暗号列表。每 30 秒尝试加入相应班级，班级满员时可启用此功能待成员退出抢占名额
 
  - <code>services</code>
 
@@ -525,7 +613,7 @@ python main.py
 <details>
 <summary><code>timeout</code></summary>
 
-连接雨课堂的超时秒数
+连接雨课堂、考试系统的超时秒数
 
 </details>
 
