@@ -532,9 +532,7 @@ python main.py
 | 长江雨课堂 | [changjiang.yuketang.cn](https://changjiang.yuketang.cn) |
 | 黄河雨课堂 | [huanghe.yuketang.cn](https://huanghe.yuketang.cn) |
 
- - <code>lesson</code>
- 
-课程签到、答题等配置
+ - <code>lesson</code>课程签到、答题等配置：
 
    - <code>classroomWhiteList</code>
 
@@ -564,9 +562,7 @@ python main.py
 
    是否实时推送 PPT 进度
 
- - <code>exam</code>
- 
-考试答题配置
+ - <code>exam</code>考试答题配置：
 
    - <code>classroomWhiteList</code>
 
@@ -596,9 +592,7 @@ python main.py
 
    考试系统访问令牌，若填写则直接使用该值进入考试系统，不会生成新的令牌；若不填写，程序将自行生成
 
- - <code>other</code>
- 
-其他配置
+ - <code>other</code>其他配置：
 
    - <code>classroomCodeList</code>
 
@@ -767,3 +761,4 @@ python llm.py
  - 项目尚有许多不足
 
  - 修改自 [timeflykai/lazytool](https://github.com/timeflykai/lazytool/tree/main)
+
