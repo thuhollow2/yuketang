@@ -30,8 +30,8 @@ cd /storage/emulated/0
 pkg update
 pkg upgrade -y
 pkg install -y python git libjpeg-turbo python-pillow zbar
-git clone https://github.com/thuhollow2/Hetangyuketang.git # 如需提前修改文件，可先自行fork
-cd Hetangyuketang
+git clone https://github.com/thuhollow2/yuketang.git # 如需提前修改文件，可先自行fork
+cd yuketang
 pip install -r requirements.txt
 ```
 
@@ -58,8 +58,8 @@ apk update
 apk upgrade
 apk add python3 py3-pip git py3-pillow zbar
 ln -sf /usr/bin/python3 /usr/bin/python
-git clone https://github.com/thuhollow2/Hetangyuketang.git # 如需提前修改文件，可先自行fork
-cd Hetangyuketang
+git clone https://github.com/thuhollow2/yuketang.git # 如需提前修改文件，可先自行fork
+cd yuketang
 pip install -r requirements.txt
 ```
 
@@ -761,4 +761,5 @@ python llm.py
  - 项目尚有许多不足
 
  - 修改自 [timeflykai/lazytool](https://github.com/timeflykai/lazytool/tree/main)
+
 
