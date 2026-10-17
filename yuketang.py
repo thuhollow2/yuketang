@@ -275,7 +275,7 @@ class yuketang:
             return
         self.set_authorization(res, lessonId)
         classroomName = self.lessonIdDict[lessonId]['classroomName']
-        self.lessonIdDict[lessonId]['header'] = f"PPT编号: {self.lessonIdDict[lessonId].get('presentation', '待获取')}\n课程: {classroomName}\n"
+        self.lessonIdDict[lessonId]['header'] = f"PPT编号: {self.lessonIdDict[lessonId].get('presentation', '待获取')}\n班级: {classroomName}\n"
         try:
             self.lessonIdDict[lessonId]['title'] = res.json()['data']['title']
             self.lessonIdDict[lessonId]['header'] += f"标题: {self.lessonIdDict[lessonId]['title']}\n教师: {res.json()['data']['teacher']['name']}\n开始时间: {convert_date(res.json()['data']['startTime'])}"
@@ -388,7 +388,7 @@ class yuketang:
         to_close_ids = []
         for course in courseList:
             if course['name'] not in self.examConfig['classroomWhiteList']: continue
-            url = f"https://{self.domain}/v2/api/web/logs/learn/{course['classroom_id']}?actype=5&page=0&offset=100&sort=-1"
+            url = f"https://{self.domain}/v2/api/web/logs/learn/{course['classroom_id']}?actype=-1&page=0&offset=100&sort=-1"
             headers = {
                 "User-Agent": self.ua,
                 "Content-Type": "application/json; charset=utf-8",
@@ -397,8 +397,8 @@ class yuketang:
             try:
                 resp = await asyncio.to_thread(requests.get, url, headers=headers, timeout=timeout)
                 exams = resp.json()['data']['activities']
-                valid_ids = {exam['courseware_id'] for exam in exams}
-                to_close_ids.extend([exam_id for exam_id in self.examIdDict if exam_id not in valid_ids])
+                valid_ids = [exam['courseware_id'] for exam in exams]
+                to_close_ids.extend([exam_id for exam_id, exam_info in self.examIdDict.items() if exam_info['classroom_id'] == course['classroom_id'] and exam_id not in valid_ids])
                 for exam in exams:
                     examId = exam['courseware_id']
                     text = ''
@@ -412,7 +412,7 @@ class yuketang:
                             'cookie': "x_access_token=" + self.examConfig['x_access_token'] if self.examConfig['x_access_token'] else '',
                             'cookie_timestamp': 0,
                             'classroom_id': course['classroom_id'],
-                            'classroom_name': course['course']['name'],
+                            'course_name': course['course']['name'],
                             'teacher': course['teacher']['name'],
                             'create_time': exam['create_time'],
                             'title': exam['title'],
@@ -447,7 +447,7 @@ class yuketang:
                         self.examIdNewList.append(examId)
                         self.examIdDict[examId]['active'] = '1'
                     if text:
-                        text += f"\n试卷编号: {examId}\n课程: {self.examIdDict[examId]['classroom_name']}\n教师: {self.examIdDict[examId]['teacher']}\n标题: {self.examIdDict[examId]['title']}\n发布时间: {convert_date(self.examIdDict[examId]['create_time'])}\n总分: {self.examIdDict[examId]['total_score']} 分\n题目数量: {self.examIdDict[examId]['problem_count']} 道\n考试时长: {str(self.examIdDict[examId]['limit'] // 60) + ' 分钟' if self.examIdDict[examId]['limit'] > 0 else '不限'}\n开始时间: {convert_date(self.examIdDict[examId]['start_time'])}\n截止时间: {convert_date(self.examIdDict[examId]['deadline']) if self.examIdDict[examId]['deadline'] > 0 else '无'}\n考试说明: {self.examIdDict[examId]['description'] or '无'}\n作答次数: {self.examIdDict[examId]['max_retry' if self.examIdDict[examId]['max_retry'] > 0 else '不限']} 次"
+                        text += f"\n试卷编号: {examId}\n课程: {self.examIdDict[examId]['course_name']}\n教师: {self.examIdDict[examId]['teacher']}\n标题: {self.examIdDict[examId]['title']}\n发布时间: {convert_date(self.examIdDict[examId]['create_time'])}\n总分: {self.examIdDict[examId]['total_score']} 分\n题目数量: {self.examIdDict[examId]['problem_count']} 道\n考试时长: {str(self.examIdDict[examId]['limit'] // 60) + ' 分钟' if self.examIdDict[examId]['limit'] > 0 else '不限'}\n开始时间: {convert_date(self.examIdDict[examId]['start_time'])}\n截止时间: {convert_date(self.examIdDict[examId]['deadline']) if self.examIdDict[examId]['deadline'] > 0 else '无'}\n考试说明: {self.examIdDict[examId]['description'] or '无'}\n作答次数: {self.examIdDict[examId]['max_retry' if self.examIdDict[examId]['max_retry'] > 0 else '不限']} 次"
                         if self.examIdDict[examId]['max_retry'] != 1:
                             if self.examIdDict[examId]['way_of_score'] == 1:
                                 text += "\n评分方式: 取最高成绩"
@@ -598,7 +598,7 @@ class yuketang:
                         body = convert_body_to_text(problem['Body'])
                         body2 = convert_body_to_text(problem['Body'], True)
                         problemsIdList.append(int(problem['ProblemID']))
-                        problems[i] = {"problemType": int(problem['ProblemType']), "option_keys": [opt['key'] for opt in problem['Options']], "option_values": [convert_body_to_text(opt['value']) for opt in problem['Options']], "num_blanks": len(problem.get('Blanks', [])), "pollingCount": int(problem.get('PollingCount', 1)), "score": float(problem.get('Score', 0)), "body": prefix + body}
+                        problems[i] = {"problemType": int(problem['ProblemType']), "option_keys": [opt['key'] for opt in problem.get('Options', [])], "option_values": [convert_body_to_text(opt['value']) for opt in problem.get('Options', [])], "num_blanks": len(problem.get('Blanks', [])), "pollingCount": int(problem.get('PollingCount', 1)), "score": float(problem.get('Score', 0)), "body": prefix + body}
                         problemType = {1: "单选题", 2: "多选题", 3: "投票题", 4: "填空题", 5: "主观题", 6: "判断题"}.get(problems[i]['problemType'], "其它题型")
                         text += "\r" + "-"*20 + f"\r第{i}题 {problemType} {fmt_num(problems[i]['score'] * 100.0)}分"
                         text2 = desc + f"\r第{i}题 {problemType}"
@@ -612,7 +612,7 @@ class yuketang:
                         if problems[i]['problemType'] in [1, 2, 3]:
                             for key, value in zip(problems[i]['option_keys'], problems[i]['option_values']):
                                 text += f"\r- {key}: {value}"
-                            for opt in problem['Options']:
+                            for opt in problem.get('Options', []):
                                 key = opt['key']
                                 value = convert_body_to_text(opt['value'], True)
                                 text2 += f"\r- {key}:\r{value}"
@@ -629,7 +629,7 @@ class yuketang:
                     body = convert_body_to_text(problem['Body'])
                     body2 = convert_body_to_text(problem['Body'], True)
                     problemsIdList.append(int(problem['ProblemID']))
-                    problems[i] = {"problemType": int(problem['ProblemType']), "option_keys": [opt['key'] for opt in problem['Options']], "option_values": [convert_body_to_text(opt['value']) for opt in problem['Options']], "num_blanks": len(problem.get('Blanks', [])), "pollingCount": int(problem.get('PollingCount', 1)), "score": float(problem.get('Score', 0)), "body": prefix + body}
+                    problems[i] = {"problemType": int(problem['ProblemType']), "option_keys": [opt['key'] for opt in problem.get('Options', [])], "option_values": [convert_body_to_text(opt['value']) for opt in problem.get('Options', [])], "num_blanks": len(problem.get('Blanks', [])), "pollingCount": int(problem.get('PollingCount', 1)), "score": float(problem.get('Score', 0)), "body": prefix + body}
                     problemType = {1: "单选题", 2: "多选题", 3: "投票题", 4: "填空题", 5: "主观题", 6: "判断题"}.get(problems[i]['problemType'], "其它题型")
                     text += "\r" + "-"*20 + f"\r第{i}题 {problemType} {fmt_num(problems[i]['score'] * 100.0)}分"
                     text2 = f"第{i}题 {problemType}"
@@ -643,7 +643,7 @@ class yuketang:
                     if problems[i]['problemType'] in [1, 2, 3]:
                         for key, value in zip(problems[i]['option_keys'], problems[i]['option_values']):
                             text += f"\r- {key}: {value}"
-                        for opt in problem['Options']:
+                        for opt in problem.get('Options', []):
                             key = opt['key']
                             value = convert_body_to_text(opt['value'], True)
                             text2 += f"\r- {key}:\r{value}"
@@ -652,7 +652,6 @@ class yuketang:
                             text += f"\r- {key}"
                             text2 += f"\r- {key}"
                     problemsBlockList.append(text2)
-            problemsIdList.sort()
             text = text.replace('\r', '\n')
             await asyncio.to_thread(self.msgmgr.sendMsg, f"试卷编号: {examId}\n{text}")
 
@@ -725,7 +724,7 @@ class yuketang:
                                 llm_answer = {str(i + 1): answer[i] for i in range(len(answer))}
                             elif results[problemId]['problemType'] == 5:  # 主观题
                                 llm_answer = {
-                                    "content": f"<div class=\"custom_ueditor_cn_body\"><p>{answer[0]}</p></div>",
+                                    "content": answer[0],
                                     "attachments": {"filelist": []}
                                 }
                             elif results[problemId]['problemType'] == 6:  # 判断题

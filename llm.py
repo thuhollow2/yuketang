@@ -680,39 +680,62 @@ def generate_siliconflow_answer(query, folder, config):
         return None
     return text
 
-def generate_infinigence_answer(query, folder, config):
-    filepath = os.path.join(folder, "long.jpg")
+def upload_deepseek_file(folder, config):
+    filepath = os.path.join(folder, "grid.jpg")
     if not os.path.exists(filepath):
         print(f"文件 {filepath} 不存在")
         return None
+    headers = {
+        "Authorization": f"Bearer {config['apiKey']}"
+    }
+    data = {
+        "purpose": "user_data",
+        "expires_after[anchor]": "created_at",
+        "expires_after[seconds]": "86400"
+    }
     with open(filepath, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode("utf-8")
-    data_uri = f"data:image/jpeg;base64,{b64}"
-    content = [
-        {"type": "text", "text": query},
-        {"type": "image_url", "image_url": {"url": data_uri}}
-    ]
+        files = {
+            "file": (os.path.basename(filepath), f.read(), "image/jpeg")
+        }
+    try:
+        r = requests.post("https://api.deepseek.com/files", headers=headers, files=files, data=data, timeout=timeout)
+        r.raise_for_status()
+        file_id = r.json()["id"]
+        return file_id
+    except Exception as e:
+        print(f"DeepSeek文件上传发生错误: {e}")
+        return None
+
+def generate_deepseek_answer(query, folder, config):
+    file_id = upload_deepseek_file(folder, config)
+    if not file_id:
+        return None
     headers = {
         "Authorization": f"Bearer {config['apiKey']}",
         "Content-Type": "application/json"
     }
+    content = [
+        {"type": "text", "text": query},
+        {"type": "file", "file_id": file_id}
+    ]
     payload = {
         "model": config['model'],
         "temperature": config['temperature'],
         "max_tokens": 10000,
+        "thinking": {"type": "disabled"},
         "messages": []
     }
     if config['prompt']:
         payload["messages"].append({"role": "system", "content": config['prompt']})
     payload["messages"].append({"role": "user", "content": content})
     try:
-        r = requests.post(f"https://cloud.infini-ai.com/maas/v1/chat/completions", headers=headers, data=json.dumps(payload), timeout=timeout)
+        r = requests.post("https://api.deepseek.com/chat/completions", headers=headers, data=json.dumps(payload), timeout=timeout)
         r.raise_for_status()
         text = r.json().get("choices", [{}])[0].get("message", {}).get("content", '')
+        return text
     except Exception as e:
-        print(f"InfiniGence生成回答发生错误: {e}")
+        print(f"DeepSeek生成回答发生错误: {e}")
         return None
-    return text
 
 def generate_zhipu_answer(query, folder, config):
     filepath = os.path.join(folder, "rect.jpg")

@@ -1,0 +1,21 @@
+# Android / Gradle local build files
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.cxx/
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Runtime downloads, cookies, and logs (tracked examples remain tracked)
+/data/
+*.log
+
+# Local signing material
+*.keystore
+*.jks

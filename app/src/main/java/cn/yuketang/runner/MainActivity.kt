@@ -86,6 +86,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -618,7 +619,7 @@ private fun GlobalConfig(config: JSONObject, save: (JSONObject, String) -> Unit)
     var yktTimeout by remember(config.toString()) { mutableStateOf(ykt.optInt("timeout", 30).toString()) }
     var sendTimeout by remember(config.toString()) { mutableStateOf(send.optInt("timeout", 30).toString()) }
     var sendThreads by remember(config.toString()) { mutableStateOf(send.optInt("threads", 5).toString()) }
-    var llmTimeout by remember(config.toString()) { mutableStateOf(llm.optInt("timeout", 60).toString()) }
+    var llmTimeout by remember(config.toString()) { mutableStateOf(llm.optInt("timeout", 300).toString()) }
     var llmThreads by remember(config.toString()) { mutableStateOf(llm.optInt("threads", 5).toString()) }
     var utilTimeout by remember(config.toString()) { mutableStateOf(util.optInt("timeout", 30).toString()) }
     var utilThreads by remember(config.toString()) { mutableStateOf(util.optInt("threads", 10).toString()) }
@@ -648,7 +649,7 @@ private fun GlobalConfig(config: JSONObject, save: (JSONObject, String) -> Unit)
                     next.getJSONObject("yuketang").put("timeout", yktTimeout.toIntOrNull() ?: 30)
                     next.getJSONObject("send").put("timeout", sendTimeout.toIntOrNull() ?: 30)
                     next.getJSONObject("send").put("threads", sendThreads.toIntOrNull() ?: 5)
-                    next.getJSONObject("llm").put("timeout", llmTimeout.toIntOrNull() ?: 60)
+                    next.getJSONObject("llm").put("timeout", llmTimeout.toIntOrNull() ?: 300)
                     next.getJSONObject("llm").put("threads", llmThreads.toIntOrNull() ?: 5)
                     next.getJSONObject("util").put("timeout", utilTimeout.toIntOrNull() ?: 30)
                     next.getJSONObject("util").put("threads", utilThreads.toIntOrNull() ?: 10)
@@ -1029,7 +1030,6 @@ private fun ConfigList(title: String, action: String, onAction: () -> Unit, cont
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("用表单维护常用字段，复杂字段可到 JSON 修改", color = Muted, fontSize = 13.sp)
             }
             Button(onClick = onAction, colors = ButtonDefaults.buttonColors(containerColor = Primary)) {
                 Text(action)
@@ -1159,7 +1159,12 @@ private fun UserDialog(
     FormDialog(
         title = if (initialUser == null) "新增账号" else "编辑账号",
         onDismiss = onDismiss,
-        onConfirm = {
+        onConfirm = save@ {
+            val duplicateName = lessonStartTimeItems.duplicateScheduleName()
+            if (duplicateName != null) {
+                Toast.makeText(context, "上课时间中班级名称重复：$duplicateName", Toast.LENGTH_SHORT).show()
+                return@save
+            }
             onConfirm(
                 JSONObject()
                     .put("name", name.ifBlank { "user" })
@@ -1192,8 +1197,8 @@ private fun UserDialog(
         SwitchRow("启用账号", enabled) { enabled = it }
         HorizontalDivider()
         Text("课程配置", fontWeight = FontWeight.Bold, color = Ink)
-        ListEditor("课程白名单", lessonWhiteItems)
-        ListEditor("课程黑名单", lessonBlackItems)
+        ListEditor("班级白名单", lessonWhiteItems)
+        ListEditor("班级黑名单", lessonBlackItems)
         ScheduleEditor("上课时间", lessonStartTimeItems)
         SwitchRow("课程启用 LLM", lessonLlm) { lessonLlm = it }
         SwitchRow("课程自动答题", lessonAn) { lessonAn = it }
@@ -1201,7 +1206,7 @@ private fun UserDialog(
         SwitchRow("推送当前页", lessonSi) { lessonSi = it }
         HorizontalDivider()
         Text("考试配置", fontWeight = FontWeight.Bold, color = Ink)
-        ListEditor("考试白名单", examWhiteItems)
+        ListEditor("班级白名单", examWhiteItems)
         FormField("x_access_token", xAccessToken) { xAccessToken = it }
         SwitchRow("考试启用 LLM", examLlm) { examLlm = it }
         SwitchRow("考试自动答题", examAn) { examAn = it }
@@ -1429,6 +1434,7 @@ private fun FormDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = DialogProperties(dismissOnClickOutside = false),
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text = {
             Column(
@@ -1557,7 +1563,7 @@ private fun ensureConfigDefaults(config: JSONObject) {
     val llm = config.optJSONObject("llm") ?: JSONObject().also { config.put("llm", it) }
     if (!llm.has("models")) llm.put("models", JSONArray())
     if (!llm.has("threads")) llm.put("threads", 5)
-    if (!llm.has("timeout")) llm.put("timeout", 60)
+    if (!llm.has("timeout")) llm.put("timeout", 300)
     val util = config.optJSONObject("util") ?: JSONObject().also { config.put("util", it) }
     if (!util.has("threads")) util.put("threads", 10)
     if (!util.has("timeout")) util.put("timeout", 30)
@@ -1607,7 +1613,7 @@ private fun buildUserDetail(user: JSONObject): String {
     val examWhite = exam.optJSONArray("classroomWhiteList")?.joinText().orEmpty().ifBlank { "-" }
     val lessonTime = lesson.optJSONObject("classroomStartTimeDict")?.toString()?.ifBlank { "-" } ?: "-"
     val codes = other.optJSONArray("classroomCodeList")?.joinText().orEmpty().ifBlank { "-" }
-    return "课程白名单：$lessonWhite\n课程黑名单：$lessonBlack\n上课时间：$lessonTime\n考试白名单：$examWhite\n其他邀请码：$codes\n通知服务：$services"
+    return "课程配置 · 班级白名单：$lessonWhite\n课程配置 · 班级黑名单：$lessonBlack\n上课时间：$lessonTime\n考试配置 · 班级白名单：$examWhite\n其他邀请码：$codes\n通知服务：$services"
 }
 
 private fun buildServiceSubtitle(service: JSONObject): String {
@@ -1717,32 +1723,32 @@ private fun defaultServiceTemplate(type: String): JSONObject = when (type) {
 }
 
 private fun defaultModelTemplate(type: String): JSONObject = when (type) {
-    "claude" -> commonModelTemplate("claude-opus-4-6", "claude", "claude-opus-4-6", 0.2)
-    "grok" -> commonModelTemplate("grok-4.20-0309-reasoning", "grok", "grok-4.20-0309-reasoning", 0.2)
-    "gemini" -> commonModelTemplate("gemini-3-flash-preview", "gemini", "gemini-3-flash-preview", 0.2)
-    "cloudflare" -> commonModelTemplate("cloudflare-kimi-k2.5", "cloudflare", "@cf/moonshotai/kimi-k2.5", 0.2)
+    "claude" -> commonModelTemplate("claude-fable-5-1", "claude", "claude-fable-5-1", 0.2)
+    "grok" -> commonModelTemplate("grok-4.7", "grok", "grok-4.7", 0.2)
+    "gemini" -> commonModelTemplate("gemini-3.8-flash", "gemini", "gemini-3.8-flash", 0.2)
+    "cloudflare" -> commonModelTemplate("cloudflare-kimi-k2.6", "cloudflare", "@cf/moonshotai/kimi-k2.6", 0.2)
         .put("accountId", "").put("apiToken", "")
-    "openrouter" -> commonModelTemplate("openrouter-gpt-oss-120b", "openrouter", "openai/gpt-oss-120b:free", 0.2)
+    "openrouter" -> commonModelTemplate("openrouter-claude-haiku-5.5", "openrouter", "anthropic/claude-haiku-5.5:batch", 0.2)
     "poixe" -> commonModelTemplate("poixe-gpt-5.2", "poixe", "gpt-5.2:free", 0.2)
-    "siliconflow" -> commonModelTemplate("siliconflow-Kimi-K2.5", "siliconflow", "Pro/moonshotai/Kimi-K2.5", 0.2)
-    "infinigence" -> commonModelTemplate("infinigence-kimi-k2.5", "infinigence", "kimi-k2.5", 0.2)
+    "siliconflow" -> commonModelTemplate("siliconflow-Kimi-K2.6", "siliconflow", "Pro/moonshotai/Kimi-K2.6", 0.2)
+    "deepseek" -> commonModelTemplate("deepseek-flash", "deepseek", "deepseek-flash", 0.2)
     "zhipu" -> commonModelTemplate("zhipu-glm-5v-turbo", "zhipu", "glm-5v-turbo", 0.2)
-    "dmxapi" -> commonModelTemplate("dmxapi-glm-4.1v-9b-thinking", "dmxapi", "GLM-4.1V-9B-Thinking", 0.2)
-    "modelscope" -> commonModelTemplate("modelscope-Kimi-K2.5", "modelscope", "moonshotai/Kimi-K2.5", 0.2)
+    "dmxapi" -> commonModelTemplate("dmxapi-glm-5.3", "dmxapi", "glm-5.3", 0.2)
+    "modelscope" -> commonModelTemplate("modelscope-DeepSeek-V4.1-Flash-1017", "modelscope", "deepseek-ai/DeepSeek-V4.1-Flash-1017", 0.2)
         .put("accessToken", "")
-    "moonshot" -> commonModelTemplate("moonshot-kimi-k2.5", "moonshot", "kimi-k2.5", 1.0)
-    "volcengine" -> commonModelTemplate("volcengine-doubao-seed-2-0-pro-260215", "volcengine", "doubao-seed-2-0-pro-260215", 0.2)
+    "moonshot" -> commonModelTemplate("moonshot-kimi-k3", "moonshot", "kimi-k3", 1.0)
+    "volcengine" -> commonModelTemplate("volcengine-doubao-seed-2-1-pro-260915", "volcengine", "doubao-seed-2-1-pro-260915", 0.2)
     "poloapi" -> commonModelTemplate("poloapi-gemini-2.5-flash", "poloapi", "gemini-2.5-flash", 0.2)
-    "bailian" -> commonModelTemplate("bailian-qwen3.6-plus", "bailian", "qwen3.6-plus", 0.2)
-    "qianfan" -> commonModelTemplate("qianfan-ernie-5.0-thinking-preview", "qianfan", "ernie-5.0-thinking-preview", 0.2)
-    "xunfei" -> commonModelTemplate("xunfei-xop3qwen32bvl", "xunfei", "xop3qwen32bvl", 0.2)
-    "minimax" -> commonModelTemplate("minimax-MiniMax-M2.7", "minimax", "MiniMax-M2.7", 0.2)
-    "sensecore" -> commonModelTemplate("sensecore-SenseNova-V6-Pro", "sensecore", "SenseNova-V6-Pro", 0.2)
+    "bailian" -> commonModelTemplate("bailian-qwen3.8-omni-flash", "bailian", "qwen3.8-omni-flash", 0.2)
+    "qianfan" -> commonModelTemplate("qianfan-ernie-5.0", "qianfan", "ernie-5.0", 0.2)
+    "xunfei" -> commonModelTemplate("xunfei-spark-x2.5", "xunfei", "spark-x2.5", 0.2)
+    "minimax" -> commonModelTemplate("minimax-MiniMax-M3", "minimax", "MiniMax-M3", 0.2)
+    "sensecore" -> commonModelTemplate("sensecore-SenseNova-V6.5-Pro", "sensecore", "SenseNova-V6.5-Pro", 0.2)
         .put("accessKeyId", "").put("accessKeySecret", "")
-    "mistral" -> commonModelTemplate("mistral-mistral-small-latest", "mistral", "mistral-small-latest", 0.2)
-    "tencent" -> commonModelTemplate("tencent-kimi-k2.5", "tencent", "kimi-k2.5", 0.2)
-    "cohere" -> commonModelTemplate("cohere-command-a-vision-07-2025", "cohere", "command-a-vision-07-2025", 0.2)
-    else -> commonModelTemplate("openai-gpt-5.4", "openai", "gpt-5.4", 1.0)
+    "mistral" -> commonModelTemplate("mistral-large-4", "mistral", "mistral-large-4", 0.2)
+    "tencent" -> commonModelTemplate("tencent-kimi-k3", "tencent", "kimi-k3", 1.0)
+    "cohere" -> commonModelTemplate("cohere-command-a-plus-05-2026", "cohere", "command-a-plus-05-2026", 0.2)
+    else -> commonModelTemplate("openai-gpt-6-astra", "openai", "gpt-6-astra", 1.0)
 }
 
 private fun commonModelTemplate(name: String, type: String, model: String, temperature: Double): JSONObject =
@@ -1759,7 +1765,7 @@ private fun commonModelTemplate(name: String, type: String, model: String, tempe
 private val SERVICE_TYPES = listOf("wechat", "dingtalk", "feishu")
 private val MODEL_TYPES = listOf(
     "openai", "claude", "grok", "gemini", "cloudflare", "openrouter", "poixe",
-    "siliconflow", "infinigence", "zhipu", "dmxapi", "modelscope", "moonshot",
+    "siliconflow", "deepseek", "zhipu", "dmxapi", "modelscope", "moonshot",
     "volcengine", "poloapi", "bailian", "qianfan", "xunfei", "minimax",
     "sensecore", "mistral", "tencent", "cohere"
 )
@@ -1876,24 +1882,46 @@ private fun ListEditor(label: String, items: MutableList<String>) {
 
 @Composable
 private fun ScheduleEditor(label: String, items: MutableList<ScheduleEntry>) {
+    val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(label, color = Ink, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            TextButton(onClick = { items.add(ScheduleEntry("", mutableStateListOf())) }) { Text("+") }
+            TextButton(onClick = {
+                val duplicateName = items.duplicateScheduleName()
+                val error = when {
+                    items.any { it.name.isBlank() } -> "请先填写已有条目的班级名称"
+                    duplicateName != null -> "班级名称重复：$duplicateName"
+                    else -> null
+                }
+                if (error != null) {
+                    Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+                } else {
+                    items.add(ScheduleEntry("", mutableStateListOf()))
+                }
+            }) { Text("+") }
         }
         if (items.isNotEmpty()) {
             items.forEachIndexed { index, entry ->
+                val duplicateName = entry.name.trim().let { name ->
+                    name.isNotBlank() && items.withIndex().any { (otherIndex, other) ->
+                        otherIndex != index && other.name.trim() == name
+                    }
+                }
                 CardBlock {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("课程 ${index + 1}", color = Ink, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text("班级 ${index + 1}", color = Ink, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         TextButton(onClick = { items.removeAt(index) }) { Text("-") }
                     }
                     OutlinedTextField(
                         value = entry.name,
                         onValueChange = { items[index] = entry.copy(name = it) },
-                        label = { Text("课程名称") },
+                        label = { Text("班级名称") },
+                        isError = duplicateName,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    if (duplicateName) {
+                        Text("班级名称不能重复，请合并到同一条目", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                    }
                     WeekTimeEditor(entry.times)
                 }
             }
@@ -1975,9 +2003,22 @@ private fun MutableList<String>.toJsonArray(): JSONArray = JSONArray().apply {
     this@toJsonArray.map { it.trim() }.filter { it.isNotBlank() }.forEach { put(it) }
 }
 
-private fun MutableList<ScheduleEntry>.toJsonObject(): JSONObject = JSONObject().apply {
-    this@toJsonObject.filter { it.name.trim().isNotBlank() }
-        .forEach { put(it.name.trim(), it.times.toWeekJsonObject()) }
+private fun List<ScheduleEntry>.duplicateScheduleName(): String? {
+    val names = mutableSetOf<String>()
+    for (entry in this) {
+        val name = entry.name.trim()
+        if (name.isNotBlank() && !names.add(name)) return name
+    }
+    return null
+}
+
+private fun MutableList<ScheduleEntry>.toJsonObject(): JSONObject {
+    val duplicateName = duplicateScheduleName()
+    require(duplicateName == null) { "班级名称不能重复：$duplicateName" }
+    return JSONObject().apply {
+        this@toJsonObject.filter { it.name.trim().isNotBlank() }
+            .forEach { put(it.name.trim(), it.times.toWeekJsonObject()) }
+    }
 }
 
 private fun runtimeDataDir(homeDir: File): File = File(homeDir, "data")
@@ -2147,7 +2188,7 @@ private const val DEFAULT_CONFIG = """
   "llm": {
     "models": [],
     "threads": 5,
-    "timeout": 60
+    "timeout": 300
   },
   "util": {
     "threads": 10,

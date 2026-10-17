@@ -452,7 +452,7 @@ python main.py
 
  - 支持多协程监听：每 30 秒扫描新课堂、尝试使用班级邀请码/课堂暗号加入新班级，随后自动签到、下载课件（PDF）、打印题目、生成并打印答案、获取 PPT 进度、自动答题等；每 30 秒扫描新考试，待用户开始考试后，下载试卷、打印题目、生成并打印答案、自动答题、同步答案等
 
- - 课程名可在雨课堂首页的课程标签里查找，具体如图中红框所示
+ - 班级名可在雨课堂首页的班级标签里查找，具体如图中红框所示
 
  ![](classroomName-1.png)
 
@@ -464,7 +464,7 @@ python main.py
 
  - 自动答题支持单选题、多选题、投票题、填空题、主观题和判断题
 
- - 若课堂自动答题未获取到答案，将提交默认答案（可修改[此处](yuketang.py#L938-L951)）
+ - 若课堂自动答题未获取到答案，将提交默认答案（可修改[此处](yuketang.py#L937-L950)）
 
  - 考试自动答题，指程序检测到用户已开始考试时，将生成或同步答案并上传至考试系统缓存；其并非正式提交，需用户手动提交试卷或考试截止自动提交试卷
 
@@ -517,15 +517,15 @@ python main.py
 
    - <code>classroomWhiteList</code>
 
-   课程白名单。记录课程名，课程名采用完全匹配，优先级低于黑名单，为空时不启用
+   班级白名单。记录班级名，班级名采用完全匹配，优先级低于黑名单，为空时不启用
 
    - <code>classroomBlackList</code>
 
-   课程黑名单。记录课程名，课程名采用完全匹配，优先级高于白名单，为空时不启用
+   班级黑名单。记录班级名，班级名采用完全匹配，优先级高于白名单，为空时不启用
 
    - <code>classroomStartTimeDict</code>
 
-   课程星期内各日最早进入时间。课程名采用完全匹配；使用指定时区，周一-周日对应 `1 - 7`，时间格式为 `HH:MM`；当日时间值不为空且此时早于该值不签到，数字或时间为空不启用
+   班级星期内各日最早进入时间。班级名采用完全匹配；使用指定时区，周一-周日对应 `1 - 7`，时间格式为 `HH:MM`；当日时间值不为空且此时早于该值不签到，数字或时间为空不启用
 
    - <code>llm</code>
 
@@ -547,7 +547,7 @@ python main.py
 
    - <code>classroomWhiteList</code>
 
-   课程白名单。记录课程名，优先级低于黑名单，课程名采用完全匹配，为空时表示不启用考试答题功能
+   班级白名单。记录班级名，优先级低于黑名单，班级名采用完全匹配，为空时表示不启用考试答题功能
 
    - <code>llm</code>
 
@@ -646,7 +646,7 @@ python main.py
 <details>
 <summary><code>models</code></summary>
 
-大语言模型配置，目前支持 [OpenAI](https://platform.openai.com/docs/models)、[Claude](https://docs.claude.com/en/docs/about-claude/models/overview)、[Grok](https://docs.x.ai/docs/models)、[Gemini](https://ai.google.dev/gemini-api/docs/models)、[Cloudflare](https://developers.cloudflare.com/workers-ai/models/)、[OpenRouter](https://openrouter.ai/models)、[Poixe](https://poixe.com/model)、[硅基流动](https://cloud.siliconflow.cn/me/models)、[无问芯穹](https://cloud.infini-ai.com/genstudio/model)、[智谱](https://bigmodel.cn/console/modelcenter/square)、[DMXAPI](https://www.dmxapi.com/pricing)、[魔塔社区](https://modelscope.cn/models)、[月之暗面](https://platform.moonshot.cn/docs/pricing/chat)、[火山方舟](https://console.volcengine.com/ark/region:ark+cn-beijing/model)、[PoloAPI](https://poloapi.com/models)、[阿里云百炼](https://bailian.console.aliyun.com/?tab=model#/model-market)、[百度千帆](https://console.bce.baidu.com/qianfan/modelcenter/model/buildIn/list)、[讯飞星辰](https://maas.xfyun.cn/modelSquare)、[MiniMax](https://www.minimaxi.com/)、[商汤大装置](https://console.sensecore.cn/aistudio/plaza)、[Mistral](https://mistral.ai/pricing#api-pricing)、[腾讯云](https://console.cloud.tencent.com/tokenhub/models)、[Cohere](https://docs.cohere.com/docs/models) 等服务商或中转站
+大语言模型配置，目前支持 [OpenAI](https://platform.openai.com/docs/models)、[Claude](https://docs.claude.com/en/docs/about-claude/models/overview)、[Grok](https://docs.x.ai/docs/models)、[Gemini](https://ai.google.dev/gemini-api/docs/models)、[Cloudflare](https://developers.cloudflare.com/workers-ai/models/)、[OpenRouter](https://openrouter.ai/models)、[Poixe](https://poixe.com/model)、[硅基流动](https://cloud.siliconflow.cn/me/models)、[DeepSeek](https://api-docs.deepseek.com/quick_start/pricing)、[智谱](https://bigmodel.cn/console/modelcenter/square)、[DMXAPI](https://www.dmxapi.com/pricing)、[魔塔社区](https://modelscope.cn/models)、[月之暗面](https://platform.moonshot.cn/docs/pricing/chat)、[火山方舟](https://console.volcengine.com/ark/region:ark+cn-beijing/model)、[PoloAPI](https://poloapi.com/models)、[阿里云百炼](https://bailian.console.aliyun.com/?tab=model#/model-market)、[百度千帆](https://console.bce.baidu.com/qianfan/modelcenter/model/buildIn/list)、[讯飞星辰](https://maas.xfyun.cn/modelSquare)、[MiniMax](https://www.minimaxi.com/)、[商汤大装置](https://console.sensecore.cn/aistudio/plaza)、[Mistral](https://mistral.ai/pricing#api-pricing)、[腾讯云](https://console.cloud.tencent.com/tokenhub/models)、[Cohere](https://docs.cohere.com/docs/models) 等服务商或中转站
 
 #### 通用字段
 | 字段 | 说明 |
@@ -669,9 +669,7 @@ python main.py
 
  - 尽量使用支持 PDF 文件或图片输入的多模态模型
 
- - 推荐使用 OpenAI、Claude、Gemini 等主流模型
-
- - 预置模型优先采用效果最好的免费模型
+ - 推荐使用 OpenAI、Claude、GLM 等主流模型
 
  - 使用非预置模型可能需要适配，可自行修改 `llm.py`
 
@@ -695,7 +693,7 @@ python main.py
 python llm.py
 ```
 
-若想测试其他课堂，可在使用程序签到该课堂、生成 PPT 文件夹后，修改 [PPT 路径](llm.py#L1248)
+若想测试其他课堂，可在使用程序签到该课堂、生成 PPT 文件夹后，修改 [PPT 路径](llm.py#L1271)
 
 </details>
 

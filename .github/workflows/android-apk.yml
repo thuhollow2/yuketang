@@ -23,6 +23,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set version from release tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tags must use vX.Y.Z format."
+            exit 1
+          fi
+          echo "APP_VERSION=$RELEASE_TAG" >> "$GITHUB_ENV"
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
@@ -48,6 +60,7 @@ jobs:
         with:
           name: yuketang-debug-apk
           path: app/build/outputs/apk/debug/yuketang-helper-v*-debug.apk
+          if-no-files-found: error
 
       - name: Check signing configuration
         id: signing
@@ -63,7 +76,8 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Missing Android signing secrets." >&2
+            echo "::error::Missing Android signing secrets. Configure ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD to publish a signed release. The debug APK is available in artifacts."
+            exit 1
           fi
 
       - name: Prepare signing keystore
@@ -90,10 +104,12 @@ jobs:
         with:
           name: yuketang-release-apk
           path: app/build/outputs/apk/release/yuketang-helper-v*.apk
+          if-no-files-found: error
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') && steps.signing.outputs.ready == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/yuketang-helper-v*.apk
+          fail_on_unmatched_files: true
           generate_release_notes: true

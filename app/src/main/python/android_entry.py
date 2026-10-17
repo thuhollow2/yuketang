@@ -159,7 +159,7 @@ def _ensure_config_defaults(home):
     defaults = {
         "yuketang": {"users": [], "timeout": 30},
         "send": {"services": [], "threads": 5, "timeout": 30},
-        "llm": {"models": [], "threads": 5, "timeout": 60},
+        "llm": {"models": [], "threads": 5, "timeout": 300},
         "util": {"threads": 10, "timeout": 30, "timezone": "Asia/Shanghai"},
     }
     config = {}

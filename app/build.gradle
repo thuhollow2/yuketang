@@ -4,9 +4,17 @@ plugins {
     id "com.chaquo.python"
 }
 
-def defaultAppVersion = "0.1.0"
+def defaultAppVersion = "0.1.2"
 def envAppVersion = System.getenv("APP_VERSION")
 def resolvedAppVersion = envAppVersion ? envAppVersion.replaceFirst(/^v/, "") : defaultAppVersion
+if (!(resolvedAppVersion ==~ /\d+\.\d+\.\d+/)) {
+    throw new GradleException("APP_VERSION must use X.Y.Z or vX.Y.Z format")
+}
+def versionParts = resolvedAppVersion.tokenize(".").collect { it.toInteger() }
+def resolvedVersionCode = versionParts[0] * 1000000L + versionParts[1] * 1000L + versionParts[2]
+if (versionParts[1] > 999 || versionParts[2] > 999 || resolvedVersionCode < 1 || resolvedVersionCode > 2100000000L) {
+    throw new GradleException("Version components or Android versionCode are out of range")
+}
 
 android {
     namespace "cn.yuketang.runner"
@@ -32,7 +40,7 @@ android {
         applicationId "cn.yuketang.runner"
         minSdk 24
         targetSdk 35
-        versionCode 1
+        versionCode resolvedVersionCode.toInteger()
         versionName resolvedAppVersion
 
         ndk {
