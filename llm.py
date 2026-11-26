@@ -60,6 +60,7 @@ class LLMManager:
             self.errors.append({"model": label, "stage": "exception", "detail": f"{type(e).__name__}: {e}"})
 
     def generateAnswer(self, folder):
+        self.errors = []  # 同一个实例被复用时，不把上一次的错误带进本次结果
         reply = {"result": [], "best_answer": {}, "errors": [], "missing": []}
         with open(os.path.join(folder, "problems.txt"), "r", encoding="utf-8") as f:
             problems = ast.literal_eval(f.read().strip())

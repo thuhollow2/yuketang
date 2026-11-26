@@ -994,7 +994,7 @@ class yuketang:
                         reply_text += f"\nPPT: 第{key}页 {problemType} {fmt_num(problems[key].get('score', 0))}分"
                         problemId = next((pid for pid, prob in lesson['problems'].items() if prob.get('index') == key), None)
                         if reply['best_answer'].get(key):
-                            if self.lessonIdDict.get(lessonId, {}).get('presentation', 0) == ppt_id:
+                            if problemId is not None and self.lessonIdDict.get(lessonId, {}).get('presentation', 0) == ppt_id:
                                 self.lessonIdDict[lessonId]['problems'][problemId]['llm_answer'] = reply['best_answer'][key]
                             reply_text += f"\n最佳答案: {reply['best_answer'][key]}\n所有答案:"
                             for r in reply["result"]:
