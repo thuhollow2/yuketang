@@ -1,0 +1,356 @@
+{
+    "yuketang": {
+        "users": [
+            {
+                "name": "user1",
+                "enabled": false,
+                "domain": "www.yuketang.cn",
+                "lesson": {
+                    "classroomWhiteList": [],
+                    "classroomBlackList": ["未央.机器学习", "未央.深度学习"],
+                    "classroomStartTimeDict": {
+                        "未央.机器学习": {"1": "08:00", "2": "13:30"},
+                        "未央.深度学习": {"1": "13:30"}
+                    },
+                    "llm": false,
+                    "an": false,
+                    "ppt": false,
+                    "si": false
+                },
+                "exam": {
+                    "classroomWhiteList": ["未央.机器学习"],
+                    "llm": false,
+                    "an": false,
+                    "paper": false,
+                    "isMaster": false,
+                    "isSlave": false,
+                    "x_access_token": ""
+                },
+                "services": ["dingtalk", "feishu"]
+            },
+            {
+                "name": "user2",
+                "enabled": false,
+                "domain": "www.yuketang.cn",
+                "lesson": {
+                    "classroomWhiteList": [],
+                    "classroomBlackList": ["未央.机器学习", "未央.深度学习"],
+                    "classroomStartTimeDict": {
+                        "未央.机器学习": {"1": "08:00", "2": "13:30"},
+                        "未央.深度学习": {"1": "13:30"}
+                    },
+                    "llm": false,
+                    "an": false,
+                    "ppt": false,
+                    "si": false
+                },
+                "exam": {
+                    "classroomWhiteList": ["未央.机器学习"],
+                    "llm": false,
+                    "an": false,
+                    "paper": false,
+                    "isMaster": false,
+                    "isSlave": false,
+                    "x_access_token": ""
+                },
+                "other": {
+                    "classroomCodeList": ["6CXASA"]
+                },
+                "services": ["dingtalk", "feishu"]
+            }
+        ],
+        "timeout": 30
+    },
+    "send": {
+        "services": [
+            {
+                "name": "wechat",
+                "enabled": false,
+                "type": "wechat",
+                "touser": "@all",
+                "agentId": "####",
+                "secret": "####",
+                "companyId": "####",
+                "msgLimit": 500,
+                "dataLimit": 20971520
+            },
+            {
+                "name": "dingtalk",
+                "enabled": false,
+                "type": "dingtalk",
+                "appKey": "####",
+                "appSecret": "####",
+                "robotCode": "####",
+                "openConversationId": "####",
+                "msgLimit": 3000,
+                "dataLimit": 20971520
+            },
+            {
+                "name": "feishu",
+                "enabled": false,
+                "type": "feishu",
+                "appId": "####",
+                "appSecret": "####",
+                "openId": "####",
+                "msgLimit": 10000,
+                "dataLimit": 31457280
+            }
+        ],
+        "threads": 5,
+        "timeout": 30
+    },
+    "llm": {
+        "models": [
+            {
+                "name": "openai-compatible-relay",
+                "enabled": false,
+                "type": "compatible",
+                "baseURL": "https://api.example.com/v1",
+                "apiKey": "####",
+                "model": "gpt-4o-mini",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "openai-gpt-6-astra",
+                "enabled": false,
+                "type": "openai",
+                "apiKey": "####",
+                "model": "gpt-6-astra",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 1,
+                "score": 100
+            },
+            {
+                "name": "claude-fable-5-1",
+                "enabled": false,
+                "type": "claude",
+                "apiKey": "####",
+                "model": "claude-fable-5-1",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "grok-4.7",
+                "enabled": false,
+                "type": "grok",
+                "apiKey": "####",
+                "model": "grok-4.7",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "gemini-3.8-flash",
+                "enabled": false,
+                "type": "gemini",
+                "apiKey": "####",
+                "model": "gemini-3.8-flash",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "cloudflare-kimi-k2.6",
+                "enabled": false,
+                "type": "cloudflare",
+                "accountId": "####",
+                "apiToken": "####",
+                "model": "@cf/moonshotai/kimi-k2.6",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "openrouter-claude-haiku-5.5",
+                "enabled": false,
+                "type": "openrouter",
+                "apiKey": "####",
+                "model": "anthropic/claude-haiku-5.5:batch",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "poixe-gpt-5.2",
+                "enabled": false,
+                "type": "poixe",
+                "apiKey": "####",
+                "model": "gpt-5.2:free",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "siliconflow-Kimi-K2.6",
+                "enabled": false,
+                "type": "siliconflow",
+                "apiKey": "####",
+                "model": "Pro/moonshotai/Kimi-K2.6",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "deepseek-flash",
+                "enabled": false,
+                "type": "deepseek",
+                "apiKey": "####",
+                "model": "deepseek-flash",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "zhipu-glm-5v-turbo",
+                "enabled": false,
+                "type": "zhipu",
+                "apiKey": "####",
+                "model": "glm-5v-turbo",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "dmxapi-glm-5.3",
+                "enabled": false,
+                "type": "dmxapi",
+                "apiKey": "####",
+                "model": "glm-5.3",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "modelscope-DeepSeek-V4.1-Flash-1017",
+                "enabled": false,
+                "type": "modelscope",
+                "accessToken": "####",
+                "model": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "moonshot-kimi-k3",
+                "enabled": false,
+                "type": "moonshot",
+                "apiKey": "####",
+                "model": "kimi-k3",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 1,
+                "score": 100
+            },
+            {
+                "name": "volcengine-doubao-seed-2-1-pro-260915",
+                "enabled": false,
+                "type": "volcengine",
+                "apiKey": "####",
+                "model": "doubao-seed-2-1-pro-260915",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "poloapi-gemini-2.5-flash",
+                "enabled": false,
+                "type": "poloapi",
+                "apiKey": "####",
+                "model": "gemini-2.5-flash",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "bailian-qwen3.8-omni-flash",
+                "enabled": false,
+                "type": "bailian",
+                "apiKey": "####",
+                "model": "qwen3.8-omni-flash",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "qianfan-ernie-5.0",
+                "enabled": false,
+                "type": "qianfan",
+                "apiKey": "####",
+                "model": "ernie-5.0",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "xunfei-spark-x2.5",
+                "enabled": false,
+                "type": "xunfei",
+                "apiKey": "####",
+                "model": "spark-x2.5",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "minimax-MiniMax-M3",
+                "enabled": false,
+                "type": "minimax",
+                "apiKey": "####",
+                "model": "MiniMax-M3",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "sensecore-SenseNova-V6.5-Pro",
+                "enabled": false,
+                "type": "sensecore",
+                "accessKeyId": "####",
+                "accessKeySecret": "####",
+                "model": "SenseNova-V6.5-Pro",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "mistral-large-4",
+                "enabled": false,
+                "type": "mistral",
+                "apiKey": "####",
+                "model": "mistral-large-4",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            },
+            {
+                "name": "tencent-kimi-k3",
+                "enabled": false,
+                "type": "tencent",
+                "apiKey": "####",
+                "model": "kimi-k3",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 1,
+                "score": 100
+            },
+            {
+                "name": "cohere-command-a-plus-05-2026",
+                "enabled": false,
+                "type": "cohere",
+                "apiKey": "####",
+                "model": "command-a-plus-05-2026",
+                "prompt": "You are a helpful assistant.",
+                "temperature": 0.2,
+                "score": 100
+            }
+        ],
+        "threads": 5,
+        "timeout": 300
+    },
+    "util": {
+        "timezone": "Asia/Shanghai",
+        "threads": 20,
+        "timeout": 30
+    }
+}
