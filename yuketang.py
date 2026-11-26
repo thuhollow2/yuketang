@@ -12,6 +12,7 @@ from random import randint
 from send import SendManager
 from llm import LLMManager
 from draw import compose_from_strlist
+from alerting import alert, format_reasons
 from util import *
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -94,6 +95,18 @@ class yuketang:
         }
         self.msgmgr = SendManager(f"[{self.name}]\n", self.services)
         self.ua = "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36"
+        if self.lessonConfig['an'] and not self.lessonConfig['llm']:
+            print(f"[{self.name}] 警告: lesson.an 已开启但 lesson.llm 未开启，题目不会自动作答（无答案来源）")
+        if self.examConfig['an'] and not self.examConfig['llm']:
+            print(f"[{self.name}] 警告: exam.an 已开启但 exam.llm 未开启，考试题目不会自动作答（无答案来源）")
+
+    def _report(self, title, detail):
+        """答题异常告警：推送到已配置的推送服务，同时在本地控制台/声音/通知/日志留痕。"""
+        try:
+            self.msgmgr.sendMsg(f"{title}\n{detail}", echo=False)
+        except Exception:
+            pass
+        alert(title, detail)
 
     async def get_cookie(self):
         flag = 0
@@ -691,19 +704,41 @@ class yuketang:
                     f.write(str(problems))
 
             reply = None
+            llm_errors = []
             results = {key: {} for key in problemsIdList}
             if problems:
                 if os.path.exists(os.path.join(folder, "reply.txt")):
                     with open(os.path.join(folder, "reply.txt"), "r", encoding="utf-8") as f:
                         reply = ast.literal_eval(f.read().strip())
+                    llm_errors = reply.get('errors') or []
                 elif self.examConfig['llm']:
-                    reply = await asyncio.to_thread(LLMManager().generateAnswer, folder)
+                    try:
+                        reply = await asyncio.to_thread(LLMManager().generateAnswer, folder)
+                        llm_errors = reply.get('errors') or []
+                    except Exception as e:
+                        reply = {"best_answer": {}, "errors": [{"model": "-", "stage": "exception", "detail": f"{type(e).__name__}: {e}"}]}
+                        llm_errors = reply["errors"]
                     if reply.get('best_answer', {}):
                         with open(os.path.join(folder, "reply.txt"), "w", encoding="utf-8") as f:
                             f.write(str(reply))
                     else:
                         reply = None
-                if reply is not None:
+                else:
+                    llm_errors = [{"model": "-", "stage": "config", "detail": "config.json 中 exam.llm 未开启，没有答案来源"}]
+                if reply is None:
+                    reason_text = format_reasons(llm_errors)
+                    for key in problems_keys:
+                        problemId = problemsIdList[key - 1]
+                        results[problemId]['problemType'] = problems[key]['problemType']
+                        results[problemId]['llm_error'] = reason_text
+                    # 开了自动作答时由 answer_exam 负责告警，避免重复提醒
+                    if not self.examConfig['an']:
+                        await asyncio.to_thread(self._report, "考试未取得大模型答案，已跳过作答", (
+                            f"试卷编号: {examId}\n题目: {len(problems_keys)} 题\n"
+                            f"原因:\n{reason_text}\n"
+                            f"处理: 未写入任何答案，请自行到考试页面作答。"
+                        ))
+                else:
                     reply_text = "LLM答案列表:"
                     for key in problems_keys:
                         reply_text += "\n" + "-"*20
@@ -734,7 +769,8 @@ class yuketang:
                                 if r["answer_dict"].get(key):
                                     reply_text += f"\n[{r['score']}, {r['usedTime']}] {r['name']}: {r['answer_dict'][key]}"
                         else:
-                            reply_text += f"\n无答案"
+                            results[problemId]['llm_error'] = format_reasons(llm_errors)
+                            reply_text += f"\n无答案（该题已跳过）"
                         results[problemId]['llm_answer'] = llm_answer
                     await asyncio.to_thread(self.msgmgr.sendMsg, f"试卷编号: {examId}\n消息: {reply_text}")
 
@@ -784,16 +820,35 @@ class yuketang:
                 "results": []
             }
             submitted_answer = {}
+            missing = []
             for problemId, ans in self.examIdDict[examId]['problems'].items():
                 answer = ans.get('master_answer', []) or ans.get('llm_answer', [])
-                if not answer: continue
+                if not answer:
+                    missing.append(problemId)
+                    continue
                 submitted_answer[problemId] = answer
                 data['results'].append({
                     "problem_id": problemId,
                     "result": answer,
                     "time": int(time.time() * 1000) - randint(1000, 20000)
                 })
+            if not submitted_answer:
+                reason = next((ans.get('llm_error') for ans in self.examIdDict[examId]['problems'].values() if ans.get('llm_error')), "模型没有返回答案")
+                await asyncio.to_thread(self._report, "考试未提交任何答案", (
+                    f"试卷编号: {examId}\n"
+                    f"全部 {len(missing)} 题都没有取得大模型答案，已跳过作答（不会提交空答案）\n"
+                    f"原因:\n{reason}\n"
+                    f"处理: 请自行到考试页面作答。"
+                ))
+                return
+            if missing:
+                await asyncio.to_thread(self._report, "部分考试题目未取得答案", (
+                    f"试卷编号: {examId}\n"
+                    f"未作答 {len(missing)} 题，已写入 {len(submitted_answer)} 题\n"
+                    f"处理: 未作答的题目请自行补答。"
+                ))
             res = None
+            ok = False
             try:
                 retries = 3
                 while retries > 0:
@@ -804,9 +859,19 @@ class yuketang:
                     else:
                         for problemId, ans in submitted_answer.items():
                             self.examIdDict[examId]['problems'][problemId]['submitted_answer'] = ans
+                        ok = True
                         break
-            except:
-                pass
+            except Exception as e:
+                await asyncio.to_thread(self._report, "考试答案写入异常", (
+                    f"试卷编号: {examId}\n错误: {type(e).__name__}: {str(e)[:200]}\n"
+                    f"处理: 请到考试页面确认答案是否已保存。"
+                ))
+                return
+            if not ok:
+                detail = f"试卷编号: {examId}\n接口返回: {(res.text[:300] if res is not None else '无响应')}"
+                await asyncio.to_thread(self._report, "考试答案写入失败", (
+                    f"{detail}\n处理: {len(submitted_answer)} 题均未确认写入，请到考试页面确认。"
+                ))
 
     async def fetch_presentation(self, lessonId, ppt_id):
         async with _get_fetch_lock(lessonId, 1):  # 同一 lessonId 串行, 跨 lessonId 并行
@@ -888,33 +953,58 @@ class yuketang:
                     f.write(str(problems))
 
             reply = None
+            llm_errors = []
             if problems:
                 if os.path.exists(os.path.join(folder, "reply.txt")):
                     with open(os.path.join(folder, "reply.txt"), "r", encoding="utf-8") as f:
                         reply = ast.literal_eval(f.read().strip())
+                    llm_errors = reply.get('errors') or []
                 elif self.lessonConfig['llm']:
-                    reply = await asyncio.to_thread(LLMManager().generateAnswer, folder)
+                    try:
+                        reply = await asyncio.to_thread(LLMManager().generateAnswer, folder)
+                        llm_errors = reply.get('errors') or []
+                    except Exception as e:
+                        reply = {"best_answer": {}, "errors": [{"model": "-", "stage": "exception", "detail": f"{type(e).__name__}: {e}"}]}
+                        llm_errors = reply["errors"]
                     if reply.get('best_answer', {}):
                         with open(os.path.join(folder, "reply.txt"), "w", encoding="utf-8") as f:
                             f.write(str(reply))
                     else:
                         reply = None
-                if reply is not None:
+                else:
+                    llm_errors = [{"model": "-", "stage": "config", "detail": "config.json 中 lesson.llm 未开启，没有答案来源"}]
+                if reply is None:
+                    # 一题都没拿到答案：记录原因并告警，绝不用默认答案顶替
+                    reason_text = format_reasons(llm_errors)
+                    for key in problems_keys:
+                        problemId = next((pid for pid, prob in lesson['problems'].items() if prob.get('index') == key), None)
+                        if problemId is not None:
+                            lesson['problems'][problemId]['llm_error'] = reason_text
+                    # 开了自动作答时，等题目解锁会逐题告警，这里就不再重复打扰
+                    if not self.lessonConfig['an']:
+                        detail = (f"PPT编号: {ppt_id}\n题目: {len(problems_keys)} 题（第 {problems_keys[0]}-{problems_keys[-1]} 页）\n"
+                                  f"原因:\n{reason_text}\n"
+                                  f"处理: 已跳过自动作答，不会提交默认答案。请手动作答，或检查模型配置/余额后重试。")
+                        await asyncio.to_thread(self._report, "未取得大模型答案，已跳过自动作答", detail)
+                else:
                     reply_text = "LLM答案列表:"
                     for key in problems_keys:
                         reply_text += "\n" + "-"*20
                         problemType = {1: "单选题", 2: "多选题", 3: "投票题", 4: "填空题", 5: "主观题", 6: "判断题"}.get(problems[key]['problemType'], "其它题型")
                         reply_text += f"\nPPT: 第{key}页 {problemType} {fmt_num(problems[key].get('score', 0))}分"
+                        problemId = next((pid for pid, prob in lesson['problems'].items() if prob.get('index') == key), None)
                         if reply['best_answer'].get(key):
-                            if self.lessonIdDict.get(lessonId, {}).get('presentation', 0) == ppt_id:
-                                problemId = next((pid for pid, prob in lesson['problems'].items() if prob.get('index') == key), None)
+                            if problemId is not None and self.lessonIdDict.get(lessonId, {}).get('presentation', 0) == ppt_id:
                                 self.lessonIdDict[lessonId]['problems'][problemId]['llm_answer'] = reply['best_answer'][key]
                             reply_text += f"\n最佳答案: {reply['best_answer'][key]}\n所有答案:"
                             for r in reply["result"]:
                                 if r["answer_dict"].get(key):
                                     reply_text += f"\n[{r['score']}, {r['usedTime']}] {r['name']}: {r['answer_dict'][key]}"
                         else:
-                            reply_text += f"\n无答案"
+                            reason_text = format_reasons(llm_errors)
+                            if problemId is not None:
+                                lesson['problems'][problemId]['llm_error'] = reason_text
+                            reply_text += f"\n无答案（该题已跳过提交）"
                     await asyncio.to_thread(self.msgmgr.sendMsg, f"{lesson['header']}\n消息: {reply_text}")
 
             if self.lessonIdDict.get(lessonId, {}).get('presentation', 0) == ppt_id: self.lessonIdDict[lessonId]['presentation_status'] = True
@@ -928,26 +1018,22 @@ class yuketang:
             "Content-Type": "application/json",
             "Authorization": self.lessonIdDict[lessonId]['Authorization']
         }
-        llm_answer = self.lessonIdDict[lessonId]['problems'][self.lessonIdDict[lessonId]['problemId']].get('llm_answer')
-        tp = self.lessonIdDict[lessonId]['problems'][self.lessonIdDict[lessonId]['problemId']]['problemType']
+        problem = self.lessonIdDict[lessonId]['problems'][self.lessonIdDict[lessonId]['problemId']]
+        llm_answer = problem.get('llm_answer')
+        tp = problem['problemType']
         problemType = {1: "单选题", 2: "多选题", 3: "投票题", 4: "填空题", 5: "主观题", 6: "判断题"}.get(tp, "其它题型")
-        if llm_answer:
-            answer = llm_answer
-        else:
-            if tp == 1: # 单选题
-                answer = [self.lessonIdDict[lessonId]['problems'][self.lessonIdDict[lessonId]['problemId']]['options'][0]['key']]
-            elif tp == 2: # 多选题
-                answer = [self.lessonIdDict[lessonId]['problems'][self.lessonIdDict[lessonId]['problemId']]['options'][0]['key']]
-            elif tp == 3: # 投票题
-                answer = [self.lessonIdDict[lessonId]['problems'][self.lessonIdDict[lessonId]['problemId']]['options'][0]['key']]
-            elif tp == 4: # 填空题
-                answer = [''] * len(self.lessonIdDict[lessonId]['problems'][self.lessonIdDict[lessonId]['problemId']]['blanks'])
-            elif tp == 5: # 主观题
-                answer = ['']
-            elif tp == 6: # 判断题
-                answer = [self.lessonIdDict[lessonId]['problems'][self.lessonIdDict[lessonId]['problemId']]['options'][0]['key']]
-            else: # 其它题型
-                answer = ['']
+        if not llm_answer:
+            # 拿不到大模型答案就不作答：不再用第一个选项/空串顶替
+            reason = problem.get('llm_error') or "模型没有返回这道题的答案，或 lesson.llm 未开启"
+            body = str(problem.get('body', '')).strip() or '（题干为空）'
+            self._report("未取得大模型答案，已跳过提交", (
+                f"PPT: 第{problem.get('index')}页 {problemType} {fmt_num(problem.get('score', 0))}分\n"
+                f"问题: {body}\n"
+                f"原因: {reason}\n"
+                f"处理: 本题未提交任何答案（不会用默认选项顶替），请到课堂页面手动作答。"
+            ))
+            return
+        answer = llm_answer
         data = {
             "dt": int(time.time() * 1000) - randint(1, 1000),
             "problemId": self.lessonIdDict[lessonId]['problemId'],
@@ -955,20 +1041,36 @@ class yuketang:
             "result": answer if tp != 5 else {"content": answer[0], "pics": [{"pic": "", "thumb": ""}]}
         }
         res = None
+        ok = False
+        last_text = ''
         try:
             retries = 3
             while retries > 0:
                 res = requests.post(url=url, headers=headers, json=data, timeout=timeout)
-                if res.json().get('msg') != 'OK':
+                try:
+                    payload = res.json()
+                except Exception:
+                    payload = {}
+                last_text = str(payload)[:200] if payload else str(getattr(res, 'text', ''))[:200]
+                if payload.get('msg') != 'OK':
                     retries -= 1
                     time.sleep(1)
                 else:
+                    ok = True
                     break
-        except:
-            pass
+        except Exception as e:
+            last_text = f"{type(e).__name__}: {e}"
         if res is not None:
             self.set_authorization(res, lessonId)
-        self.msgmgr.sendMsg(f"{self.lessonIdDict[lessonId]['header']}\nPPT: 第{self.lessonIdDict[lessonId]['problems'][self.lessonIdDict[lessonId]['problemId']]['index']}页 {problemType} {fmt_num(self.lessonIdDict[lessonId]['problems'][self.lessonIdDict[lessonId]['problemId']].get('score', 0))}分\n问题: {self.lessonIdDict[lessonId]['problems'][self.lessonIdDict[lessonId]['problemId']]['body']}\n提交答案: {answer}")
+        if not ok:
+            self._report("答案提交失败", (
+                f"PPT: 第{problem.get('index')}页 {problemType}\n"
+                f"问题: {str(problem.get('body', '')).strip()[:200]}\n"
+                f"拟提交: {answer}\n"
+                f"接口返回: {last_text or '无响应'}\n"
+                f"处理: 请到课堂页面确认本题是否已作答。"
+            ))
+        self.msgmgr.sendMsg(f"{self.lessonIdDict[lessonId]['header']}\nPPT: 第{problem.get('index')}页 {problemType} {fmt_num(problem.get('score', 0))}分\n问题: {problem.get('body')}\n提交答案: {answer}")
 
     async def ws_controller(self, func, *args, retries=3, delay=10):
         attempt = 0

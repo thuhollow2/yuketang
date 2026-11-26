@@ -8,7 +8,18 @@ import freetype
 import math
 import qrcode
 from html import unescape
-from pyzbar.pyzbar import decode
+try:
+    from pyzbar.pyzbar import decode
+except Exception:  # Windows 缺少 VC++2013 运行时（msvcr120.dll）时 pyzbar 无法加载
+    decode = None
+try:
+    import zxingcpp
+except Exception:
+    zxingcpp = None
+try:
+    import cv2
+except Exception:
+    cv2 = None
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
@@ -46,6 +57,35 @@ def freeze(o):
 def equal_unordered(a, b):
     return freeze(a) == freeze(b)
 
+def decode_qr_text(path):
+    """解码二维码图片内容。依次尝试 pyzbar / zxing-cpp / opencv，全部失败返回空串。"""
+    if not os.path.exists(path):
+        return ""
+    try:
+        if decode is not None:
+            for barcode in decode(Image.open(path)):
+                return barcode.data.decode("utf-8")
+    except Exception:
+        pass
+    try:
+        if zxingcpp is not None:
+            result = zxingcpp.read_barcode(Image.open(path))
+            if result is not None and result.text:
+                return result.text
+    except Exception:
+        pass
+    try:
+        if cv2 is not None:
+            img = cv2.imread(path)
+            if img is not None:
+                text, _, _ = cv2.QRCodeDetector().detectAndDecode(img)
+                if text:
+                    return text
+    except Exception:
+        pass
+    return ""
+
+
 def download_qrcode(url, name):
     safe_name = sanitize_filename(name)
     qr_filename = os.path.join(qr_dir, f"qrcode_{safe_name}.jpg")
@@ -57,10 +97,10 @@ def download_qrcode(url, name):
     with open(qr_filename, "wb") as f:
         f.write(res.content)
     print(f"[{name}]\n登录二维码已保存为{qr_filename}")
-    barcode_url = ''
-    barcodes = decode(Image.open(qr_filename))
-    for barcode in barcodes:
-        barcode_url = barcode.data.decode("utf-8")
+    barcode_url = decode_qr_text(qr_filename)
+    if not barcode_url:
+        print(f"[{name}]\n二维码内容解析失败，跳过终端渲染，可直接扫描 {qr_filename}")
+        return
 
     qr = qrcode.QRCode()
     qr.add_data(barcode_url)

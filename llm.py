@@ -27,43 +27,66 @@ models = config['llm']['models']
 class LLMManager:
     def __init__(self):
         self.answers = []
+        self.errors = []   # 记录每个模型失败的具体原因，供上层告警
 
     def _generate_answer(self, tp, folder, query, config):
+        label = config.get('model') or config.get('name') or '未知模型'
         try:
             start = time.time()
             func = globals().get(f"generate_{tp}_answer")
             if not callable(func):
+                self.errors.append({"model": label, "stage": "config", "detail": f"不支持的类型: {tp}"})
                 print(f"未知类型: {tp}")
                 return
             answer = func(query, folder, config)
             end = time.time()
             usedTime = f"{end - start:.2f}s"
-            if answer: self.answers.append({
-                "name": config['name'],
-                "type": config['type'],
-                "model": config['model'],
-                "score": config['score'],
-                "usedTime": usedTime,
-                "answer": answer
-            })
-        except:
-            pass
+            if answer and str(answer).strip():
+                self.answers.append({
+                    "name": config['name'],
+                    "type": config['type'],
+                    "model": config['model'],
+                    "score": config['score'],
+                    "usedTime": usedTime,
+                    "answer": answer
+                })
+            else:
+                self.errors.append({
+                    "model": label,
+                    "stage": "empty",
+                    "detail": "接口没有返回内容（鉴权失败、额度不足、超时或被上游拒绝，详见控制台上方日志）"
+                })
+        except Exception as e:
+            self.errors.append({"model": label, "stage": "exception", "detail": f"{type(e).__name__}: {e}"})
 
     def generateAnswer(self, folder):
-        reply = {"result": [], "best_answer": {}}
+        self.errors = []  # 同一个实例被复用时，不把上一次的错误带进本次结果
+        reply = {"result": [], "best_answer": {}, "errors": [], "missing": []}
         with open(os.path.join(folder, "problems.txt"), "r", encoding="utf-8") as f:
             problems = ast.literal_eval(f.read().strip())
+        if not problems:
+            reply["errors"].append({"model": "-", "stage": "problem", "detail": "没有解析到任何题目"})
+            return reply
+        if not [m for m in models if m.get('enabled', False)]:
+            reply["errors"].append({"model": "-", "stage": "config", "detail": "config.json 里没有启用任何模型"})
+            return reply
         query = convert_problems_to_query(problems)
-        if not query: return reply
+        if not query:
+            reply["errors"].append({"model": "-", "stage": "problem", "detail": "题干为空，未能构造提问"})
+            return reply
         with ThreadPoolExecutor(max_workers=threads) as pool:
             tasks = [pool.submit(self._generate_answer, m['type'], folder, query, m) for m in models if m.get('enabled', False)]
             for future in as_completed(tasks):
                 try:
                     future.result()
                 except Exception as e:
+                    self.errors.append({"model": "-", "stage": "thread", "detail": f"{type(e).__name__}: {e}"})
                     print(f"生成失败: {e}")
 
-        if not self.answers: return reply
+        if not self.answers:
+            reply["errors"] = self.errors
+            reply["missing"] = list(problems.keys())
+            return reply
         for r in self.answers:
             answer_dict = convert_answer_to_dict(r['answer'], problems)
             if answer_dict: reply["result"].append({
@@ -75,6 +98,13 @@ class LLMManager:
                 "answer_dict": answer_dict,
                 "answer": r['answer']
             })
+            else:
+                snippet = str(r['answer']).replace("\n", " ")[:160]
+                self.errors.append({
+                    "model": r['model'],
+                    "stage": "parse",
+                    "detail": f"返回内容无法解析成答案格式: {snippet}"
+                })
         reply["result"].sort(key=lambda x: -float(x['usedTime'][:-1]))
         best_answer = {}
         for page in problems.keys():
@@ -107,6 +137,8 @@ class LLMManager:
                 best_answer[page] = new_list
         reply["result"].sort(key=lambda x: float(x['usedTime'][:-1]))
         reply["best_answer"] = best_answer
+        reply["errors"] = self.errors
+        reply["missing"] = [p for p in problems.keys() if not best_answer.get(p)]
         return reply
 
 def best_item(lst, scoreList=[]):
@@ -1266,6 +1298,59 @@ def generate_cohere_answer(query, folder, config):
         print(f"Cohere生成回答发生错误: {e}")
         return None
     return text
+
+def generate_compatible_answer(query, folder, config):
+    """通用 OpenAI 兼容接口：baseURL 可在 config.json 中自定义。"""
+    filepath = os.path.join(folder, "long.jpg")
+    content = [{"type": "text", "text": query}]
+    # 图片过长（整节课 PPT 拼接）时视觉模型无法辨认，且中转站会因体积过大拒绝请求，
+    # 此时降级为纯文本：题干与选项文本已在 query 中。
+    if os.path.exists(filepath):
+        try:
+            from PIL import Image
+            with Image.open(filepath) as im:
+                w, h = im.size
+            if h <= 3000:
+                with open(filepath, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode("utf-8")
+                content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
+            else:
+                print(f"图片高度 {h}px 过大，本次仅使用文本题干作答")
+        except Exception as e:
+            print(f"读取图片失败，本次仅使用文本题干: {e}")
+    else:
+        print(f"文件 {filepath} 不存在，本次仅使用文本题干")
+    base_url = (config.get('baseURL') or '').strip().rstrip('/')
+    if not base_url:
+        print("compatible 类型缺少 baseURL 配置")
+        return None
+    headers = {
+        "Authorization": f"Bearer {config['apiKey']}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": config['model'],
+        "temperature": config['temperature'],
+        "max_tokens": 8000,
+        "messages": []
+    }
+    if config['prompt']:
+        payload["messages"].append({"role": "system", "content": config['prompt']})
+    payload["messages"].append({"role": "user", "content": content})
+    try:
+        r = requests.post(base_url + "/chat/completions", headers=headers, data=json.dumps(payload), timeout=timeout)
+    except Exception as e:
+        raise RuntimeError(f"请求失败 {type(e).__name__}: {str(e)[:150]}") from e
+    if r.status_code != 200:
+        raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
+    try:
+        text = r.json()["choices"][0]["message"]["content"]
+    except Exception:
+        raise RuntimeError(f"返回结构异常: {r.text[:200]}")
+    if not str(text).strip():
+        raise RuntimeError("模型返回了空内容")
+    return text
+
 
 if __name__ == "__main__":
     folder = os.path.join(file_dir, "pro.yuketang.cn", "lesson", "1529274209982060032")

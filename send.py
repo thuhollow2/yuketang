@@ -71,8 +71,9 @@ class SendManager:
         if access_token:
             send_fs_file(upload_fs_file(path, access_token, service['dataLimit']), service, access_token)
 
-    def sendMsg(self, msg):
-        print(self.prefix + msg + '\n')
+    def sendMsg(self, msg, echo=True):
+        if echo:
+            print(self.prefix + msg + '\n')
         tasks = []
         with ThreadPoolExecutor(max_workers=threads) as pool:
             for s in self.services:
