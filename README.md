@@ -74,6 +74,8 @@ pip install -r requirements.txt
 pip install -r requirements.txt
 ```
  - `pyzbar` 是对 **ZBar** 的 Python 封装，本身需要系统里有 **libzbar** 动态库；非 Windows 上必须先装 zbar 才能用，详情见 [pyzbar 安装说明](https://github.com/NaturalHistoryMuseum/pyzbar#installation)
+ - Windows 上 `pyzbar` 还依赖 VC++ 2013 运行库（`msvcr120.dll`），缺失时会自动回退到 `zxing-cpp` 或 `opencv-python-headless`，装不上 `pyzbar` 时改用其中任一即可
+ - Windows 部署踩过的坑与对应处理见 [docs/windows-troubleshooting.md](docs/windows-troubleshooting.md)
 
 </details>
 
