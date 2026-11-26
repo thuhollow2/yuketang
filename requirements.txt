@@ -6,4 +6,9 @@ websockets
 freetype-py
 qrcode
 Pillow
+# 二维码解码：pyzbar 需要系统 libzbar；Windows 上还依赖 VC++ 2013 运行库（msvcr120.dll），
+# 缺失时导入会失败。程序已做回退（pyzbar -> zxing-cpp -> opencv），三者任装其一即可。
+# 若 pyzbar 无法加载，可改用：
+#   pip install zxing-cpp
+#   pip install opencv-python-headless
 pyzbar
